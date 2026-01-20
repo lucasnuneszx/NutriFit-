@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BodyScan - Análise de Composição Corporal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        /* Animações */
+        @keyframes neon-glow {
+            0%, 100% {
+                text-shadow: 0 0 10px rgba(34, 197, 94, 0.8),
+                            0 0 20px rgba(34, 197, 94, 0.6);
+                box-shadow: 0 0 20px rgba(34, 197, 94, 0.4),
+                           inset 0 0 20px rgba(34, 197, 94, 0.1);
+            }
+            50% {
+                text-shadow: 0 0 20px rgba(34, 197, 94, 1),
+                            0 0 30px rgba(34, 197, 94, 0.8);
+                box-shadow: 0 0 30px rgba(34, 197, 94, 0.6),
+                           inset 0 0 30px rgba(34, 197, 94, 0.2);
+            }
+        }
+
+        @keyframes pulse-scan {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slide-in {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .neon-title {
+            animation: neon-glow 2s ease-in-out infinite;
+        }
+
+        .pulse-animation {
+            animation: pulse-scan 1.5s ease-in-out infinite;
+        }
+
+        .slide-in-animation {
+            animation: slide-in 0.5s ease-out;
+        }
+
+        .card-gradient {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.8) 100%);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            backdrop-filter: blur(10px);
+        }
+
+        .drag-active {
+            background: rgba(34, 197, 94, 0.1);
+            border-color: rgba(34, 197, 94, 0.8) !important;
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+        }
+
+        .progress-bar {
+            height: 3px;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+            border-radius: 10px;
+            animation: pulse-scan 1.5s ease-in-out infinite;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            border: none;
+            color: #0f172a;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.5);
+            color: #22c55e;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: rgba(34, 197, 94, 0.8);
+        }
+
+        .stat-item {
+            background: rgba(34, 197, 94, 0.05);
+            border-left: 3px solid #22c55e;
+            padding: 15px;
+            border-radius: 5px;
+        }
+
+        .success-badge {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: #0f172a;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen flex items-center justify-center p-4">
+        <div class="w-full max-w-4xl">
+            <!-- Header -->
+            <div class="text-center mb-12">
+                <h1 class="text-5xl font-bold mb-4 neon-title">BODYSCAN</h1>
+                <p class="text-lg text-gray-400">Análise de Composição Corporal por IA</p>
+            </div>
+
+            <!-- Main Container -->
+            <div class="grid md:grid-cols-2 gap-8">
+                <!-- Coluna 1: Upload e Preview -->
+                <div class="space-y-6">
+                    <!-- Card de Upload -->
+                    <div class="card-gradient rounded-lg p-8 border-2 border-dashed border-green-500 transition-all cursor-pointer" 
+                         id="dropZone">
+                        <div class="text-center py-8">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-green-500 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
+                            <h3 class="text-xl font-semibold mb-2">Arraste sua foto aqui</h3>
+                            <p class="text-gray-400 text-sm mb-4">ou clique para selecionar</p>
+                            <input type="file" id="fileInput" accept="image/*" />
+                        </div>
+                    </div>
+
+                    <!-- Botões de Ação -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <button class="btn-primary px-6 py-3 rounded-lg font-semibold" onclick="document.getElementById('fileInput').click()">
+                            📁 Galeria
+                        </button>
+                        <button class="btn-primary px-6 py-3 rounded-lg font-semibold" onclick="abrirCamera()">
+                            📷 Câmera
+                        </button>
+                    </div>
+
+                    <!-- Preview de Imagem -->
+                    <div id="previewContainer" class="card-gradient rounded-lg p-6 hidden">
+                        <img id="previewImage" src="" alt="Preview" class="w-full rounded-lg mb-4">
+                        <div class="flex gap-3">
+                            <button class="btn-primary flex-1 py-2 rounded-lg font-semibold" onclick="analisarFisico()">
+                                🔍 Analisar Físico
+                            </button>
+                            <button class="btn-secondary flex-1 py-2 rounded-lg font-semibold" onclick="limparImagem()">
+                                ✕ Limpar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Disclaimer de Saúde -->
+                    <div class="bg-yellow-900 bg-opacity-30 border border-yellow-600 border-opacity-50 rounded-lg p-4">
+                        <p class="text-xs text-yellow-200">
+                            <strong>⚠️ Aviso de Saúde:</strong> Esta é uma análise visual estimada baseada em Inteligência Artificial. 
+                            <strong>Não substitui uma avaliação médica ou de um profissional de saúde qualificado.</strong> 
+                            Utilize este resultado apenas como referência complementar. Consulte um nutricionista ou médico para orientações personalizadas.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Coluna 2: Resultados -->
+                <div>
+                    <!-- Estado de Carregamento -->
+                    <div id="loadingState" class="hidden">
+                        <div class="card-gradient rounded-lg p-8">
+                            <div class="text-center space-y-6">
+                                <div class="pulse-animation inline-block">
+                                    <svg class="w-16 h-16 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </div>
+                                <h3 class="text-2xl font-semibold text-green-400">Escaneando...</h3>
+                                <p class="text-gray-400">Analisando sua composição corporal</p>
+                                <div class="space-y-2">
+                                    <div class="progress-bar"></div>
+                                    <p class="text-xs text-gray-500">Aguarde alguns momentos...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card de Resultados -->
+                    <div id="resultsCard" class="hidden card-gradient rounded-lg p-8 space-y-6 slide-in-animation">
+                        <div class="success-badge">✓ Análise Concluída</div>
+
+                        <!-- Biotipo -->
+                        <div class="stat-item">
+                            <p class="text-gray-400 text-sm uppercase tracking-wider">Biotipo</p>
+                            <p class="text-2xl font-bold text-green-400" id="biotipo">-</p>
+                        </div>
+
+                        <!-- % Gordura -->
+                        <div class="stat-item">
+                            <p class="text-gray-400 text-sm uppercase tracking-wider">Estimativa de Gordura Corporal</p>
+                            <p class="text-2xl font-bold text-green-400" id="percentualGordura">-</p>
+                        </div>
+
+                        <!-- Pontos Fortes Musculares -->
+                        <div class="stat-item">
+                            <p class="text-gray-400 text-sm uppercase tracking-wider mb-3">Pontos Fortes Musculares</p>
+                            <ul id="pontosFortes" class="space-y-2 text-sm">
+                                <li>• Carregando...</li>
+                            </ul>
+                        </div>
+
+                        <!-- Recomendações de Macro -->
+                        <div class="stat-item">
+                            <p class="text-gray-400 text-sm uppercase tracking-wider mb-3">Sugestão de Macronutrientes</p>
+                            <div id="macrosDiv" class="space-y-2 text-sm">
+                                <p>Carregando...</p>
+                            </div>
+                        </div>
+
+                        <!-- Botão de Ação -->
+                        <button class="btn-primary w-full py-3 rounded-lg font-semibold" onclick="novaAnalise()">
+                            🔄 Nova Análise
+                        </button>
+                    </div>
+
+                    <!-- Estado Inicial -->
+                    <div id="initialState" class="card-gradient rounded-lg p-8 text-center space-y-4">
+                        <svg class="w-20 h-20 mx-auto text-green-500 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <h3 class="text-xl font-semibold">Pronto para começar?</h3>
+                        <p class="text-gray-400">Selecione uma foto para iniciar a análise de sua composição corporal</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="text-center mt-12 text-gray-500 text-sm">
+                <p>© 2026 NutriFit+ | BodyScan v1.0 | Powered by Advanced AI Vision</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input de câmera (hidden) -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+
+    <script>
+        // ==================== VARIÁVEIS GLOBAIS ====================
+        let imagemBase64 = null;
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const cameraInput = document.getElementById('cameraInput');
+        const previewContainer = document.getElementById('previewContainer');
+        const previewImage = document.getElementById('previewImage');
+
+        // ==================== EVENT LISTENERS ====================
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => processarImagem(e.target.files[0]));
+        cameraInput.addEventListener('change', (e) => processarImagem(e.target.files[0]));
+
+        // Drag & Drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-active');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-active');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-active');
+            processarImagem(e.dataTransfer.files[0]);
+        });
+
+        // ==================== FUNÇÕES PRINCIPAIS ====================
+
+        /**
+         * Processa a imagem selecionada
+         */
+        function processarImagem(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Por favor, selecione uma imagem válida');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagemBase64 = e.target.result;
+                previewImage.src = imagemBase64;
+                previewContainer.classList.remove('hidden');
+                document.getElementById('initialState').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Abre a câmera do dispositivo
+         */
+        function abrirCamera() {
+            cameraInput.click();
+        }
+
+        /**
+         * Limpa a imagem selecionada
+         */
+        function limparImagem() {
+            imagemBase64 = null;
+            previewContainer.classList.add('hidden');
+            document.getElementById('initialState').classList.remove('hidden');
+            fileInput.value = '';
+        }
+
+        /**
+         * FUNÇÃO PRINCIPAL: Analisa o físico usando IA Vision
+         * Esta função deve ser integrada com seu backend/API
+         */
+        async function analisarFisico() {
+            if (!imagemBase64) {
+                alert('Por favor, selecione uma imagem primeiro');
+                return;
+            }
+
+            // Mostrar estado de carregamento
+            previewContainer.classList.add('hidden');
+            document.getElementById('initialState').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+            document.getElementById('resultsCard').classList.add('hidden');
+
+            try {
+                // ==================== SYSTEM PROMPT PARA IA DE VISÃO ====================
+                const systemPrompt = `Você é um Nutricionista Esportivo Elite com 15+ anos de experiência em análise de composição corporal.
+
+ANÁLISE OBRIGATÓRIA:
+1. BIOTIPO: Classifique como Ectomorfo, Mesomorfo, Endomorfo ou Combinado (ex: "Meso-Endomorfo")
+
+2. ESTIMATIVA DE GORDURA CORPORAL: Forneça um percentual visual estimado (ex: "18-22%")
+
+3. PONTOS FORTES MUSCULARES: Liste 3-4 grupos musculares mais desenvolvidos visualmente
+
+4. SUGESTÃO DE MACRONUTRIENTES: Recomende proporção de Proteína/Carboidrato/Gordura adequada ao biotipo
+
+FORMATO DE RESPOSTA (OBRIGATÓRIO):
+Use este padrão exato para que o código javascript consiga processar:
+
+BIOTIPO: [Seu Resultado]
+PERCENTUAL_GORDURA: [Seu Resultado]
+PONTOS_FORTES: [Resultado 1] | [Resultado 2] | [Resultado 3] | [Resultado 4]
+MACROS: Proteína: [X]% | Carboidratos: [X]% | Gorduras: [X]%
+OBSERVACOES: [Observações gerais e dicas breves]
+
+Seja preciso mas educado. Lembre-se: isto é uma ESTIMATIVA VISUAL, não um diagnóstico médico.`;
+
+                // ==================== PAYLOAD PARA API ====================
+                const payload = {
+                    imagem_base64: imagemBase64,
+                    model: "gpt-4-vision", // ou "claude-vision", "vertex-vision" conforme sua API
+                    system_prompt: systemPrompt,
+                    max_tokens: 500,
+                    temperatura: 0.3 // Mais baixo = mais consistente
+                };
+
+                // ==================== CHAMADA À API ====================
+                // SUBSTITUA A URL ABAIXO PELA SUA REAL
+                const API_ENDPOINT = "SEU_ENDPOINT_API_AQUI"; // Exemplo: "https://seuapi.com/api/bodyscan/analise"
+
+                // Simulação para teste (remova quando integrar com API real)
+                if (API_ENDPOINT === "SEU_ENDPOINT_API_AQUI") {
+                    // Simula resposta da IA
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const respostaSimulada = `BIOTIPO: Mesomorfo
+PERCENTUAL_GORDURA: 15-18%
+PONTOS_FORTES: Ombros e costas desenvolvidos | Peitoral bem definido | Core marcado | Pernas proporcionais
+MACROS: Proteína: 35% | Carboidratos: 45% | Gorduras: 20%
+OBSERVACOES: Físico atlético bem estruturado. Continuar com treino de força e manter déficit calórico leve.`;
+                    processarResposta(respostaSimulada);
+                } else {
+                    // Integração com API real
+                    const response = await fetch(API_ENDPOINT, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": "Bearer SEU_TOKEN_AQUI" // Se necessário
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    processarResposta(data.resposta_ia || data.resultado);
+                }
+
+            } catch (erro) {
+                console.error('Erro ao analisar:', erro);
+                alert('Erro ao analisar a imagem. Verifique o console para detalhes.\n\nDica: Configure seu API_ENDPOINT no código JavaScript.');
+                document.getElementById('loadingState').classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Processa a resposta da IA e popula os resultados
+         */
+        function processarResposta(resposta) {
+            try {
+                // Parse da resposta estruturada
+                const linhas = resposta.split('\n').filter(l => l.trim());
+                const dados = {};
+
+                linhas.forEach(linha => {
+                    const [chave, valor] = linha.split(':').map(s => s.trim());
+                    if (chave && valor) {
+                        dados[chave] = valor;
+                    }
+                });
+
+                // Preencher biotipo
+                document.getElementById('biotipo').textContent = dados['BIOTIPO'] || 'Não determinado';
+
+                // Preencher % gordura
+                document.getElementById('percentualGordura').textContent = dados['PERCENTUAL_GORDURA'] || 'Não disponível';
+
+                // Preencher pontos fortes
+                const pontosFortes = dados['PONTOS_FORTES']?.split('|').map(p => p.trim()) || [];
+                document.getElementById('pontosFortes').innerHTML = pontosFortes
+                    .map(ponto => `<li>• ${ponto}</li>`)
+                    .join('');
+
+                // Preencher macros
+                const macros = dados['MACROS'] || 'Não disponível';
+                document.getElementById('macrosDiv').innerHTML = `
+                    <p class="font-semibold text-green-400">${macros}</p>
+                    ${dados['OBSERVACOES'] ? `<p class="text-gray-300 text-xs mt-3">${dados['OBSERVACOES']}</p>` : ''}
+                `;
+
+                // Mostrar resultados
+                document.getElementById('loadingState').classList.add('hidden');
+                document.getElementById('resultsCard').classList.remove('hidden');
+
+            } catch (erro) {
+                console.error('Erro ao processar resposta:', erro);
+                alert('Erro ao processar resposta da IA');
+                document.getElementById('loadingState').classList.add('hidden');
+                previewContainer.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Reinicia para nova análise
+         */
+        function novaAnalise() {
+            previewContainer.classList.remove('hidden');
+            document.getElementById('resultsCard').classList.add('hidden');
+            document.getElementById('loadingState').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
