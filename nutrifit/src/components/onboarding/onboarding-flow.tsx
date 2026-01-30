@@ -272,8 +272,12 @@ export function OnboardingFlow() {
                         body: JSON.stringify({ draft, plan: "free" }),
                       });
 
+                      // Aguardar um pouco para garantir que tudo foi processado
+                      await new Promise(resolve => setTimeout(resolve, 500));
+
                       // Mostrar oferta automaticamente após criar conta
                       setShowOffer(true);
+                      setSignupLoading(false);
                     } catch (e: unknown) {
                       setError(getErrorMessage(e) || "Erro ao criar conta.");
                       setSignupLoading(false);

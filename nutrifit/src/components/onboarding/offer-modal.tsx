@@ -43,11 +43,24 @@ export function OfferModal({
     return () => window.clearInterval(id);
   }, [open]);
 
+  // Forçar renderização quando open mudar
+  React.useEffect(() => {
+    if (open) {
+      // Garantir que o modal apareça no topo
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       {open ? (
         <motion.div
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-[9999]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
