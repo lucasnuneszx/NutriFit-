@@ -148,7 +148,7 @@ Retorne APENAS JSON válido (sem markdown) com esta estrutura:
     }
 
     // Adicionar IMC calculado se disponível
-    if (imc && !resultado.imcEstimado) {
+    if (imc && resultado && !resultado.imcEstimado) {
       resultado.imcEstimado = imc;
     }
 
