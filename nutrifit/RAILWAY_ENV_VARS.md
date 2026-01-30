@@ -5,8 +5,8 @@ Copie e cole estas variáveis no Railway Dashboard → Seu Serviço → Variable
 ## 🔐 Obrigatórias
 
 ```env
-# PostgreSQL (Railway)
-DATABASE_URL=postgresql://postgres:SENHA@HOST:PORTA/railway
+# PostgreSQL (Railway) - USE A URL PÚBLICA, NÃO A INTERNA!
+DATABASE_URL=postgresql://postgres:SENHA@turntable.proxy.rlwy.net:PORTA/railway
 DB_SSL=true
 
 # JWT Secret (OBRIGATÓRIO - Gere uma string aleatória segura)
@@ -22,11 +22,13 @@ PERFECT_PAY_API_TOKEN=seu-token-jwt-perfect-pay-aqui
 
 ## 📝 Como obter cada variável:
 
-### 1. DATABASE_URL
+### 1. DATABASE_URL (IMPORTANTE!)
 - No Railway Dashboard → Seu projeto → PostgreSQL
 - Clique em "Connect" ou "Variables"
-- Copie a `DATABASE_URL` completa
-- Exemplo: `postgresql://postgres:abc123@turntable.proxy.rlwy.net:5432/railway`
+- **USE A URL PÚBLICA** (que contém `turntable.proxy.rlwy.net` ou `proxy.rlwy.net`)
+- **NÃO USE** a URL interna (`postgres.railway.internal`)
+- Exemplo correto: `postgresql://postgres:abc123@turntable.proxy.rlwy.net:5432/railway`
+- Exemplo ERRADO: `postgresql://postgres:abc123@postgres.railway.internal:5432/railway`
 
 ### 2. JWT_SECRET
 - Gere uma string aleatória segura (mínimo 32 caracteres)
@@ -45,14 +47,25 @@ PERFECT_PAY_API_TOKEN=seu-token-jwt-perfect-pay-aqui
 
 ## 🚀 Após configurar as variáveis:
 
-1. Acesse: `https://seu-dominio.railway.app/api/admin/setup-database`
-2. Isso criará todas as tabelas necessárias
-3. Ou execute o SQL manualmente no Railway PostgreSQL → Query
+1. **Acesse a URL para criar tabelas:**
+   ```
+   https://seu-dominio.railway.app/api/admin/setup-database
+   ```
 
-## ⚠️ Importante:
+2. **Ou execute o SQL manualmente:**
+   - Railway Dashboard → PostgreSQL → Query
+   - Copie o conteúdo de `supabase/SCHEMA_COMPLETO.sql`
+   - Cole e execute
+
+## ⚠️ IMPORTANTE - DATABASE_URL:
+
+- **USE SEMPRE A URL PÚBLICA** (com `proxy.rlwy.net`)
+- A URL interna (`railway.internal`) só funciona dentro da rede do Railway
+- Se você estiver acessando de fora (como pelo endpoint), precisa da URL pública
+
+## 🔒 Segurança:
 
 - **NUNCA** compartilhe essas variáveis publicamente
 - **NUNCA** commite o `.env.local` no git
 - Use variáveis diferentes para desenvolvimento e produção
 - O `JWT_SECRET` deve ser único e seguro em produção
-
