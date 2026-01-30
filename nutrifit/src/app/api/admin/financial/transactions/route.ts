@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
@@ -11,88 +11,50 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
   const { searchParams } = new URL(request.url);
   const limitRaw = searchParams.get("limit");
   const limit = limitRaw ? Math.min(100, Math.max(1, Number(limitRaw))) : 50;
 
-  const cookieStore = await cookies();
-  const client = serviceKey
-    ? createClient(url, serviceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    : createClient(url, anonKey, {
-        cookies: {
-          getAll: () => cookieStore.getAll(),
-          setAll: () => {},
-        },
-      });
-
   try {
     // Tenta usar função RPC primeiro
-    const { data: rpcData, error: rpcError } = await client.rpc("admin_list_transactions");
-
-    if (!rpcError && Array.isArray(rpcData)) {
-      return NextResponse.json({
-        ok: true,
-        transactions: rpcData.slice(0, limit),
-      });
-    }
-
-    // Fallback: query direta (requer service_role ou policy especial)
-    if (serviceKey) {
-      const { data, error } = await client
-        .from("transactions")
-        .select(
-          "id,user_id,tipo,plano,valor,status,metodo_pagamento,referencia_externa,notas,criado_em,atualizado_em",
-        )
-        .order("criado_em", { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        return NextResponse.json(
-          { ok: false, error: "db_error", details: error.message },
-          { status: 500 },
-        );
-      }
-
-      // Busca nomes dos usuários
-      const userIds = [...new Set((data ?? []).map((t) => t.user_id))];
-      const { data: profiles } = await client
-        .from("profiles")
-        .select("id,nome,email")
-        .in("id", userIds);
-
-      const profileMap = new Map(
-        (profiles ?? []).map((p) => [p.id, { nome: p.nome, email: p.email }]),
+    try {
+      const rpcResult = await query(
+        `SELECT * FROM admin_list_transactions() LIMIT $1`,
+        [limit]
       );
 
-      const transactions = (data ?? []).map((t) => ({
-        ...t,
-        user_nome: profileMap.get(t.user_id)?.nome ?? null,
-        user_email: profileMap.get(t.user_id)?.email ?? null,
-      }));
-
-      return NextResponse.json({ ok: true, transactions });
+      if (rpcResult.rows.length > 0) {
+        return NextResponse.json({
+          ok: true,
+          transactions: rpcResult.rows,
+        });
+      }
+    } catch {
+      // Função RPC não existe, fazer query direta
     }
 
-    return NextResponse.json(
-      { ok: false, error: "rpc_failed", details: rpcError?.message },
-      { status: 500 },
+    // Fallback: query direta
+    const transactionsResult = await query(
+      `SELECT 
+        t.id, t.user_id, t.tipo, t.plano, t.valor, t.status, 
+        t.metodo_pagamento, t.referencia_externa, t.notas, 
+        t.criado_em, t.atualizado_em,
+        p.nome as user_nome, p.email as user_email
+       FROM transactions t
+       LEFT JOIN profiles p ON p.id = t.user_id
+       ORDER BY t.criado_em DESC
+       LIMIT $1`,
+      [limit]
     );
+
+    return NextResponse.json({
+      ok: true,
+      transactions: transactionsResult.rows,
+    });
   } catch (error) {
+    console.error("[Admin Transactions] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "db_error", details: String(error) },
+      { ok: false, error: "db_error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

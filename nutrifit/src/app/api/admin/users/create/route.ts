@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { createUser } from "@/lib/auth";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
@@ -55,113 +56,70 @@ export async function POST(request: Request) {
     );
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "missing_env",
-        message: "NEXT_PUBLIC_SUPABASE_URL não configurada no .env.local",
-      },
-      { status: 500 },
-    );
-  }
-
-  if (!serviceKey) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "missing_service_key",
-        message: "SUPABASE_SERVICE_ROLE_KEY não configurada no .env.local. Configure para criar usuários.",
-      },
-      { status: 500 },
-    );
-  }
-
-  // Usa service_role para criar usuário sem verificação
-  const supabase = createClient(url, serviceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
   try {
-    // Cria o usuário no auth.users (sem verificação de email)
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Verificar se email já existe
+    const existingUser = await query(
+      `SELECT id FROM users WHERE email = $1`,
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "email_exists",
+          message: "Este email já está cadastrado. Use outro email.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // Criar usuário usando a função createUser
+    const { user, error: createError } = await createUser(
       email,
       password,
-      email_confirm: true, // Confirma email automaticamente
-      user_metadata: {
-        nome,
-        nome_assistente: "Athena", // Default
-        created_by_admin: true,
-      },
-    });
+      nome,
+      "Athena"
+    );
 
-    if (authError || !authData.user) {
-      const errorMsg = authError?.message ?? "Erro desconhecido ao criar usuário no Auth";
-      // Se o erro for de email já existente, mensagem mais clara
-      if (errorMsg.includes("already registered") || errorMsg.includes("User already registered")) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "email_exists",
-            message: "Este email já está cadastrado. Use outro email.",
-          },
-          { status: 400 },
-        );
-      }
+    if (createError || !user) {
       return NextResponse.json(
         {
           ok: false,
           error: "auth_error",
-          message: errorMsg,
+          message: createError || "Erro ao criar usuário",
         },
         { status: 500 },
       );
     }
 
-    const userId = authData.user.id;
-
-    // Cria o perfil
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: userId,
-      nome,
-      email,
-      tipo_plano: tipo_plano,
-      nome_assistente: "Athena",
-      contagem_streak: 0,
-      plano_pausado: false,
-      plano_expira_em: plano_expira_em,
-      plano_iniciado_em: plano_iniciado_em,
-    });
-
-    if (profileError) {
-      // Se falhar ao criar perfil, tenta deletar o usuário criado
-      await supabase.auth.admin.deleteUser(userId);
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "profile_error",
-          message: profileError.message,
-        },
-        { status: 500 },
-      );
-    }
+    // Atualizar perfil com dados adicionais do admin
+    await query(
+      `UPDATE profiles 
+       SET tipo_plano = $1, 
+           plano_pausado = false,
+           plano_expira_em = $2,
+           plano_iniciado_em = $3
+       WHERE id = $4`,
+      [
+        tipo_plano,
+        plano_expira_em,
+        plano_iniciado_em,
+        user.id,
+      ]
+    );
 
     return NextResponse.json({
       ok: true,
       user: {
-        id: userId,
-        email,
-        nome,
-        tipo_plano,
+        id: user.id,
+        email: user.email,
+        nome: user.nome,
+        tipo_plano: tipo_plano,
       },
     });
   } catch (error) {
+    console.error("[Admin Create User] Erro:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
       {

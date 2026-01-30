@@ -1,10 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { getUserFromToken } from "@/lib/auth";
+import type { User } from "@/lib/auth";
 
 /**
  * Middleware de autenticação (substitui Supabase)
  */
-export async function requireAuth(request: NextRequest): Promise<{ user: any; error: null } | { user: null; error: string }> {
+export async function requireAuth(request: NextRequest): Promise<{ user: User; error: null } | { user: null; error: string }> {
   const token = request.cookies.get('auth_token')?.value || null;
 
   if (!token) {

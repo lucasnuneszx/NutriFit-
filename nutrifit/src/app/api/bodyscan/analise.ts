@@ -134,10 +134,10 @@ Retorne APENAS JSON válido (sem markdown) com esta estrutura:
     const response = await result.response;
     const raw = response.text();
 
-    let resultado: any = null;
+    let resultado: Record<string, unknown> | null = null;
     try {
-      resultado = JSON.parse(raw);
-    } catch (parseError) {
+      resultado = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
       // Tentar extrair JSON se vier com markdown
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

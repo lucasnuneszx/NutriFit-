@@ -127,7 +127,7 @@ function ProfileHeader({ isMobile = false }: { isMobile?: boolean }) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     
     // Listener para quando o perfil é atualizado na página de perfil
-    const handleProfileUpdated = (event: CustomEvent<any>) => {
+    const handleProfileUpdated = (event: CustomEvent<{ foto_url?: string }>) => {
       const updatedProfile = event.detail;
       if (updatedProfile?.foto_url) {
         setImageKey((prev) => prev + 1); // Force reload da imagem

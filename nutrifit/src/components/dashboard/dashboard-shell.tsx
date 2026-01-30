@@ -839,7 +839,7 @@ export function DashboardShell() {
                         </div>
                         <div className="rounded-2xl border border-cyber-glass-border/50 bg-black/20 p-3">
                           <div className="text-sm text-muted-foreground italic">
-                            "Tem alguma dúvida sobre essa refeição? Posso ajudar com sugestões ou ajustes! 😊"
+                            &quot;Tem alguma dúvida sobre essa refeição? Posso ajudar com sugestões ou ajustes! 😊&quot;
                           </div>
                         </div>
                       </div>

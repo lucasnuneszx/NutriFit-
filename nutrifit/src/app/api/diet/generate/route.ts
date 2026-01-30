@@ -176,7 +176,7 @@ Retorne APENAS um JSON válido (sem markdown, sem código, apenas o JSON) com es
     let dietResult: DietResult | null = null;
     try {
       dietResult = JSON.parse(raw) as DietResult;
-    } catch (parseError) {
+    } catch {
       // Tentar extrair JSON se vier com markdown ou código
       const jsonMatch = raw.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

@@ -139,7 +139,7 @@ function LiveScanCard() {
           </div>
           <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
             <span className="text-foreground font-medium">
-              "Mandou bem demais, Lucas!"
+              &quot;Mandou bem demais, Lucas!&quot;
             </span>{" "}
             Combustível puro. Quer que eu ajuste isso pro seu objetivo de{" "}
             <span className="text-neon-green font-semibold">cutting</span>?

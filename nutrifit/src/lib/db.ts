@@ -41,9 +41,9 @@ function getPool(): Pool {
 /**
  * Executa uma query SQL
  */
-export async function query<T = any>(
+export async function query<T = unknown>(
   text: string,
-  params?: any[]
+  params?: unknown[]
 ): Promise<QueryResult<T>> {
   const client = getPool();
   return client.query<T>(text, params);
@@ -118,7 +118,7 @@ export class DatabaseClient {
           return { data: result.rows[0], error: null };
         },
       }),
-      insert: (data: any) => ({
+      insert: (data: Record<string, unknown>) => ({
         select: (columns: string = '*') => ({
           single: async () => {
             const keys = Object.keys(data);
@@ -133,7 +133,7 @@ export class DatabaseClient {
           },
         }),
       }),
-      update: (data: any) => ({
+      update: (data: Record<string, unknown>) => ({
         eq: (column: string, value: any) => ({
           then: async (callback?: (result: any) => any) => {
             const keys = Object.keys(data);
@@ -148,7 +148,7 @@ export class DatabaseClient {
           },
         }),
       }),
-      upsert: (data: any, options?: { onConflict?: string }) => ({
+      upsert: (data: Record<string, unknown>, options?: { onConflict?: string }) => ({
         then: async (callback?: (result: any) => any) => {
           const keys = Object.keys(data);
           const values = Object.values(data);

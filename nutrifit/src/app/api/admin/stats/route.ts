@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -11,38 +11,20 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
   try {
     const [usersRes, scansRes, workoutsRes, dietsRes] = await Promise.all([
-      supabase.from("profiles").select("id,tipo_plano", { count: "exact" }),
-      supabase.from("logs").select("id", { count: "exact" }),
-      supabase.from("workout_sessions").select("id", { count: "exact" }),
-      supabase.from("diet_plans").select("id", { count: "exact" }),
+      query<{ id: string; tipo_plano: string }>(`SELECT id, tipo_plano FROM profiles`),
+      query<{ id: number }>(`SELECT id FROM logs`),
+      query<{ id: number }>(`SELECT id FROM workout_sessions`),
+      query<{ id: number }>(`SELECT id FROM diet_plans`),
     ]);
 
-    const users = usersRes.count ?? 0;
-    const plus = usersRes.data?.filter((u) => u.tipo_plano === "plus").length ?? 0;
+    const users = usersRes.rows.length;
+    const plus = usersRes.rows.filter((u) => u.tipo_plano === "plus").length;
     const free = users - plus;
-    const scans = scansRes.count ?? 0;
-    const workouts = workoutsRes.count ?? 0;
-    const diets = dietsRes.count ?? 0;
+    const scans = scansRes.rows.length;
+    const workouts = workoutsRes.rows.length;
+    const diets = dietsRes.rows.length;
 
     return NextResponse.json({
       ok: true,
@@ -56,8 +38,9 @@ export async function GET() {
       },
     });
   } catch (error) {
+    console.error("[Admin Stats] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "db_error", details: String(error) },
+      { ok: false, error: "db_error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

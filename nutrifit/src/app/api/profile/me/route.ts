@@ -95,7 +95,7 @@ export async function PUT(request: Request) {
 
     // Construir query de update dinâmica
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     const allowedFields = [

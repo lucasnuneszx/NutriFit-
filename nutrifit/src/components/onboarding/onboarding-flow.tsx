@@ -102,7 +102,6 @@ export function OnboardingFlow() {
   const [draft, setDraft] = React.useState<OnboardingDraft>(defaultDraft);
   const [showOffer, setShowOffer] = React.useState(false);
   const [signupLoading, setSignupLoading] = React.useState(false);
-  const [signupError, setSignupError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const stored = loadDraft();

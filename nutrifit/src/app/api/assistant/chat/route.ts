@@ -95,7 +95,12 @@ export async function POST(request: Request) {
   // Para gemini-1.5-flash, não há thinking config disponível
   const isAdvancedModel = modelName.includes("gemini-3") || modelName.includes("gemini-2.0");
   
-  const modelConfig: any = {
+  const modelConfig: {
+    model: string;
+    generationConfig?: { temperature?: number; maxOutputTokens?: number };
+    systemInstruction?: string;
+    thinkingConfig?: { thinkingLevel?: string };
+  } = {
     model: modelName,
     generationConfig: {
       temperature: 0.7,

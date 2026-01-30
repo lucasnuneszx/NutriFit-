@@ -114,10 +114,10 @@ export function ProfileShell() {
       const res = await fetch("/api/profile/meals");
       if (!res.ok) return;
       
-      const data = (await res.json()) as { ok: boolean; meals: any[] };
+      const data = (await res.json()) as { ok: boolean; meals: Array<{ id: number; imagem_url: string; criado_em: string; descricao?: string }> };
       
       if (data.ok && data.meals && Array.isArray(data.meals)) {
-        const formattedMeals: MealPhoto[] = data.meals.map((meal: any) => ({
+        const formattedMeals: MealPhoto[] = data.meals.map((meal) => ({
           id: meal.id,
           url: meal.imagem_url,
           data: new Date(meal.criado_em).toLocaleDateString("pt-BR"),
@@ -191,7 +191,7 @@ export function ProfileShell() {
         throw new Error(`Upload failed: ${res.status} - ${JSON.stringify(errorData)}`);
       }
       
-      const data = (await res.json()) as { ok: boolean; meal: any };
+      const data = (await res.json()) as { ok: boolean; meal: { id: number; imagem_url: string; criado_em: string; descricao?: string } };
       
       if (data.ok && data.meal) {
         const newMeal: MealPhoto = {

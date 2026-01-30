@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(
@@ -34,86 +34,84 @@ export async function PATCH(
     adicionar_dias: number;
   }>;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_keys" }, { status: 500 });
-  }
-
-  const client = createClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: () => {},
-    },
-  });
-
-  // Se tem adicionar_dias, calcula nova data de expiração
-  let newExpiraEm: string | null = parsed.plano_expira_em ?? null;
-  if (typeof parsed.adicionar_dias === "number" && parsed.adicionar_dias > 0) {
-    const { data: current } = await client
-      .from("profiles")
-      .select("plano_expira_em")
-      .eq("id", userId)
-      .maybeSingle();
-
-    const baseDate = current?.plano_expira_em
-      ? new Date(current.plano_expira_em)
-      : new Date();
-    const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() + parsed.adicionar_dias);
-    newExpiraEm = newDate.toISOString();
-  }
-
-  // Usa função RPC ou update direto
-  if (serviceKey) {
-    const supabase = createClient(url, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
-    const updateData: Record<string, unknown> = {};
-    if (parsed.tipo_plano !== undefined) updateData.tipo_plano = parsed.tipo_plano;
-    if (parsed.plano_pausado !== undefined) updateData.plano_pausado = parsed.plano_pausado;
-    if (newExpiraEm !== undefined) updateData.plano_expira_em = newExpiraEm;
-    if (parsed.plano_iniciado_em !== undefined)
-      updateData.plano_iniciado_em = parsed.plano_iniciado_em;
-
-    const { error } = await supabase.from("profiles").update(updateData).eq("id", userId);
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: "db_error", details: error.message },
-        { status: 500 },
+  try {
+    // Se tem adicionar_dias, calcula nova data de expiração
+    let newExpiraEm: string | null = parsed.plano_expira_em ?? null;
+    if (typeof parsed.adicionar_dias === "number" && parsed.adicionar_dias > 0) {
+      const currentResult = await query<{ plano_expira_em: string | null }>(
+        `SELECT plano_expira_em FROM profiles WHERE id = $1`,
+        [userId]
       );
+
+      const current = currentResult.rows[0];
+      const baseDate = current?.plano_expira_em
+        ? new Date(current.plano_expira_em)
+        : new Date();
+      const newDate = new Date(baseDate);
+      newDate.setDate(newDate.getDate() + parsed.adicionar_dias);
+      newExpiraEm = newDate.toISOString();
     }
 
+    // Tenta usar função RPC primeiro
+    try {
+      await query(
+        `SELECT admin_update_user_plan($1, $2, $3, $4, $5)`,
+        [
+          userId,
+          parsed.tipo_plano ?? null,
+          parsed.plano_pausado ?? null,
+          newExpiraEm ?? null,
+          parsed.plano_iniciado_em ?? null,
+        ]
+      );
+      return NextResponse.json({ ok: true });
+    } catch {
+      // Função RPC não existe, fazer update direto
+    }
+
+    // Fallback: update direto
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
+
+    if (parsed.tipo_plano !== undefined) {
+      updates.push(`tipo_plano = $${paramIndex}`);
+      values.push(parsed.tipo_plano);
+      paramIndex++;
+    }
+    if (parsed.plano_pausado !== undefined) {
+      updates.push(`plano_pausado = $${paramIndex}`);
+      values.push(parsed.plano_pausado);
+      paramIndex++;
+    }
+    if (newExpiraEm !== undefined) {
+      updates.push(`plano_expira_em = $${paramIndex}`);
+      values.push(newExpiraEm);
+      paramIndex++;
+    }
+    if (parsed.plano_iniciado_em !== undefined) {
+      updates.push(`plano_iniciado_em = $${paramIndex}`);
+      values.push(parsed.plano_iniciado_em);
+      paramIndex++;
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ ok: false, error: "no_updates" }, { status: 400 });
+    }
+
+    values.push(userId);
+
+    await query(
+      `UPDATE profiles SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
+      values
+    );
+
     return NextResponse.json({ ok: true });
-  }
-
-  // Fallback: usa RPC
-  const { error } = await client.rpc("admin_update_user_plan", {
-    target_user_id: userId,
-    new_tipo_plano: parsed.tipo_plano ?? null,
-    new_pausado: parsed.plano_pausado ?? null,
-    new_expira_em: newExpiraEm ?? null,
-    new_iniciado_em: parsed.plano_iniciado_em ?? null,
-  });
-
-  if (error) {
+  } catch (error) {
+    console.error("[Admin Update User] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "db_error", details: error.message },
+      { ok: false, error: "db_error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({ ok: true });
 }

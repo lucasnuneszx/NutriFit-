@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -11,66 +11,49 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const client = serviceKey
-    ? createClient(url, serviceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    : createClient(url, anonKey, {
-        cookies: {
-          getAll: () => cookieStore.getAll(),
-          setAll: () => {},
-        },
-      });
-
   try {
-    // Tenta usar função RPC primeiro
-    const { data: rpcData, error: rpcError } = await client.rpc("admin_financial_stats");
+    // Usar função RPC se existir, senão calcular manualmente
+    try {
+      const rpcResult = await query(
+        `SELECT * FROM admin_financial_stats()`
+      );
 
-    if (!rpcError && rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
-      const stats = rpcData[0] as {
-        receita_total: number;
-        receita_mes_atual: number;
-        receita_mes_anterior: number;
-        assinaturas_ativas: number;
-        assinaturas_canceladas: number;
-        transacoes_pagas: number;
-        transacoes_pendentes: number;
-      };
+      if (rpcResult.rows.length > 0) {
+        const stats = rpcResult.rows[0] as {
+          receita_total: number;
+          receita_mes_atual: number;
+          receita_mes_anterior: number;
+          assinaturas_ativas: number;
+          assinaturas_canceladas: number;
+          transacoes_pagas: number;
+          transacoes_pendentes: number;
+        };
 
-      return NextResponse.json({
-        ok: true,
-        stats: {
-          receitaTotal: Number(stats.receita_total ?? 0),
-          receitaMesAtual: Number(stats.receita_mes_atual ?? 0),
-          receitaMesAnterior: Number(stats.receita_mes_anterior ?? 0),
-          assinaturasAtivas: Number(stats.assinaturas_ativas ?? 0),
-          assinaturasCanceladas: Number(stats.assinaturas_canceladas ?? 0),
-          transacoesPagas: Number(stats.transacoes_pagas ?? 0),
-          transacoesPendentes: Number(stats.transacoes_pendentes ?? 0),
-        },
-      });
+        return NextResponse.json({
+          ok: true,
+          stats: {
+            receitaTotal: Number(stats.receita_total ?? 0),
+            receitaMesAtual: Number(stats.receita_mes_atual ?? 0),
+            receitaMesAnterior: Number(stats.receita_mes_anterior ?? 0),
+            assinaturasAtivas: Number(stats.assinaturas_ativas ?? 0),
+            assinaturasCanceladas: Number(stats.assinaturas_canceladas ?? 0),
+            transacoesPagas: Number(stats.transacoes_pagas ?? 0),
+            transacoesPendentes: Number(stats.transacoes_pendentes ?? 0),
+          },
+        });
+      }
+    } catch {
+      // Função RPC não existe, calcular manualmente
     }
 
     // Fallback: calcula manualmente
     const [transactionsRes, profilesRes] = await Promise.all([
-      client.from("transactions").select("valor,status,criado_em"),
-      client.from("profiles").select("id,tipo_plano,plano_pausado,plano_expira_em"),
+      query<{ valor: number | string | null; status: string; criado_em: string }>(`SELECT valor, status, criado_em FROM transactions`),
+      query<{ id: string; tipo_plano: string; plano_pausado: boolean; plano_expira_em: string | null }>(`SELECT id, tipo_plano, plano_pausado, plano_expira_em FROM profiles`),
     ]);
 
-    const transactions = transactionsRes.data ?? [];
-    const profiles = profilesRes.data ?? [];
+    const transactions = transactionsRes.rows;
+    const profiles = profilesRes.rows;
 
     const receitaTotal = transactions
       .filter((t) => t.status === "pago")
@@ -107,7 +90,9 @@ export async function GET() {
         (!p.plano_expira_em || new Date(p.plano_expira_em) > now),
     ).length;
 
-    const assinaturasCanceladas = profiles.filter((p) => p.tipo_plano === "free").length;
+    const assinaturasCanceladas = profiles.filter(
+      (p) => p.tipo_plano === "free"
+    ).length;
 
     const transacoesPagas = transactions.filter((t) => t.status === "pago").length;
     const transacoesPendentes = transactions.filter((t) => t.status === "pendente").length;
@@ -125,8 +110,9 @@ export async function GET() {
       },
     });
   } catch (error) {
+    console.error("[Admin Financial Stats] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "db_error", details: String(error) },
+      { ok: false, error: "db_error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }

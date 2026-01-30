@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createClient } from "@supabase/supabase-js";
+import { query } from "@/lib/db";
 import { isAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -11,65 +11,32 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  // Usa service_role para bypass RLS
-  const supabase = serviceKey
-    ? createClient(url, serviceKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    : null;
-
-  if (!supabase) {
-    // Fallback: usa anon key mas precisa de policy especial ou função
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!anonKey) {
-      return NextResponse.json({ ok: false, error: "missing_keys" }, { status: 500 });
+  try {
+    // Tenta usar função RPC primeiro
+    try {
+      const rpcResult = await query(`SELECT * FROM admin_list_profiles()`);
+      if (rpcResult.rows.length > 0) {
+        return NextResponse.json({ ok: true, users: rpcResult.rows });
+      }
+    } catch {
+      // Função RPC não existe, fazer query direta
     }
 
-    // Tenta usar função admin_list_profiles via RPC
-    const cookieStore = await cookies();
-    const client = createClient(url, anonKey, {
-      cookies: {
-        getAll: () => cookieStore.getAll(),
-        setAll: () => {},
-      },
-    });
+    // Fallback: query direta
+    const result = await query(
+      `SELECT 
+        id, nome, email, tipo_plano, nome_assistente, contagem_streak,
+        plano_pausado, plano_expira_em, plano_iniciado_em, criado_em, atualizado_em
+       FROM profiles
+       ORDER BY criado_em DESC`
+    );
 
-    const { data, error } = await client.rpc("admin_list_profiles");
-
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: "db_error", details: error.message },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({ ok: true, users: data ?? [] });
-  }
-
-  // Com service_role, pode fazer select direto
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id,nome,email,tipo_plano,nome_assistente,contagem_streak,plano_pausado,plano_expira_em,plano_iniciado_em,criado_em,atualizado_em",
-    )
-    .order("criado_em", { ascending: false });
-
-  if (error) {
+    return NextResponse.json({ ok: true, users: result.rows });
+  } catch (error) {
+    console.error("[Admin Users] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "db_error", details: error.message },
+      { ok: false, error: "db_error", details: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }
-
-  return NextResponse.json({ ok: true, users: data ?? [] });
 }

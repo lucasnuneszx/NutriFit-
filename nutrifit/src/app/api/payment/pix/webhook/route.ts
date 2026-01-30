@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
-import { createPerfectPayClient } from "@/lib/perfect-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
