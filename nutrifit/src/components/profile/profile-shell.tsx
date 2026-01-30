@@ -122,7 +122,6 @@ export function ProfileShell() {
           url: meal.imagem_url,
           data: new Date(meal.criado_em).toLocaleDateString("pt-BR"),
           descricao: meal.descricao || "Refeição",
-          calorias: meal.calorias || 0,
         }));
         setMeals(formattedMeals);
       }
