@@ -119,7 +119,7 @@ export async function POST(request: Request) {
       transactionId = transactionResult.rows[0]?.id?.toString() || null;
     } catch (error) {
       console.error("[Payment API] Erro ao salvar transação:", error);
-      // Continuar mesmo assim, o pagamento foi criado na Perfect Pay
+      // Continuar mesmo assim, o pagamento foi criado na Sync Pay
     }
 
     return NextResponse.json({
