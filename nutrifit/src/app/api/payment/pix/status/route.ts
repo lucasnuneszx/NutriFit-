@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { getCurrentUser } from "@/lib/auth-server";
+import { query } from "@/lib/db";
 import { createPerfectPayClient } from "@/lib/perfect-pay";
 
 export const runtime = "nodejs";
@@ -11,28 +11,7 @@ export const dynamic = "force-dynamic";
  * GET /api/payment/pix/status?payment_id=xxx
  */
 export async function GET(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   if (!user) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -46,85 +25,94 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "missing_payment_id" }, { status: 400 });
   }
 
-  // Verificar se a transação pertence ao usuário
-  const { data: transaction, error: transactionError } = await supabase
-    .from("transactions")
-    .select("id, referencia_externa, status")
-    .eq("referencia_externa", paymentId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  try {
+    // Verificar se a transação pertence ao usuário
+    const transactionResult = await query<{ id: number; referencia_externa: string; status: string; plano: string }>(
+      `SELECT id, referencia_externa, status, plano
+       FROM transactions
+       WHERE referencia_externa = $1 AND user_id = $2`,
+      [paymentId, user.id]
+    );
 
-  if (transactionError || !transaction) {
-    return NextResponse.json({ ok: false, error: "transaction_not_found" }, { status: 404 });
-  }
+    const transaction = transactionResult.rows[0];
 
-  // Se já está pago no banco, retornar direto
-  if (transaction.status === "pago") {
+    if (!transaction) {
+      return NextResponse.json({ ok: false, error: "transaction_not_found" }, { status: 404 });
+    }
+
+    // Se já está pago no banco, retornar direto
+    if (transaction.status === "pago") {
+      return NextResponse.json({
+        ok: true,
+        status: "paid",
+        paid: true,
+      });
+    }
+
+    // Verificar status na Perfect Pay
+    const perfectPay = createPerfectPayClient();
+    if (!perfectPay) {
+      return NextResponse.json(
+        { ok: false, error: "perfect_pay_not_configured" },
+        { status: 500 },
+      );
+    }
+
+    const statusResponse = await perfectPay.checkPaymentStatus(paymentId);
+
+    if (!statusResponse.success || !statusResponse.data) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "perfect_pay_error",
+          message: statusResponse.error?.message,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Se foi pago, atualizar no banco (polling)
+    if (statusResponse.data.status === "paid" && transaction.status !== "pago") {
+      // Atualizar transação
+      await query(
+        `UPDATE transactions
+         SET status = $1,
+             notas = $2,
+             atualizado_em = NOW()
+         WHERE id = $3`,
+        [
+          "pago",
+          `PIX Pago em ${statusResponse.data.paid_at || new Date().toISOString()}`,
+          transaction.id,
+        ]
+      );
+
+      // Atualizar plano do usuário
+      if (transaction.plano === "plus") {
+        await query(
+          `UPDATE profiles
+           SET tipo_plano = $1,
+               plano_pausado = false,
+               plano_iniciado_em = NOW(),
+               plano_expira_em = NOW() + INTERVAL '30 days',
+               atualizado_em = NOW()
+           WHERE id = $2`,
+          ["plus", user.id]
+        );
+      }
+    }
+
     return NextResponse.json({
       ok: true,
-      status: "paid",
-      paid: true,
+      status: statusResponse.data.status,
+      paid: statusResponse.data.status === "paid",
+      paid_at: statusResponse.data.paid_at,
     });
-  }
-
-  // Verificar status na Perfect Pay
-  const perfectPay = createPerfectPayClient();
-  if (!perfectPay) {
+  } catch (error) {
+    console.error("[Payment Status] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "perfect_pay_not_configured" },
+      { ok: false, error: "internal_error", message: error instanceof Error ? error.message : String(error) },
       { status: 500 },
     );
   }
-
-  const statusResponse = await perfectPay.checkPaymentStatus(paymentId);
-
-  if (!statusResponse.success || !statusResponse.data) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "perfect_pay_error",
-        message: statusResponse.error?.message,
-      },
-      { status: 500 },
-    );
-  }
-
-  // Se foi pago, atualizar no banco (polling)
-  if (statusResponse.data.status === "paid" && transaction.status !== "pago") {
-    // Atualizar transação
-    await supabase
-      .from("transactions")
-      .update({
-        status: "pago",
-        notas: `PIX Pago em ${statusResponse.data.paid_at || new Date().toISOString()}`,
-      })
-      .eq("id", transaction.id);
-
-    // Atualizar plano do usuário
-    const { data: trans } = await supabase
-      .from("transactions")
-      .select("plano")
-      .eq("id", transaction.id)
-      .single();
-
-    if (trans?.plano === "plus") {
-      await supabase
-        .from("profiles")
-        .update({
-          tipo_plano: "plus",
-          plano_pausado: false,
-          plano_iniciado_em: new Date().toISOString(),
-          plano_expira_em: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .eq("id", user.id);
-    }
-  }
-
-  return NextResponse.json({
-    ok: true,
-    status: statusResponse.data.status,
-    paid: statusResponse.data.status === "paid",
-    paid_at: statusResponse.data.paid_at,
-  });
 }
-

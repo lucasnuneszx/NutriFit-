@@ -5,10 +5,10 @@ export async function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  // Retornar null durante build se variáveis não estiverem configuradas
+  // Isso evita erros durante o build estático
   if (!url || !anonKey) {
-    throw new Error(
-      "Supabase env vars ausentes. Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-    );
+    return null as any;
   }
 
   const cookieStore = await cookies();
