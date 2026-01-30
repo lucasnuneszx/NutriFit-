@@ -1,13 +1,11 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname),
   eslint: {
-    ignoreDuringBuilds: true, // Ignorar erros de ESLint durante build (warnings não impedem)
+    ignoreDuringBuilds: true,
   },
   typescript: {
-    ignoreBuildErrors: false, // Não ignorar erros de TypeScript
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [
@@ -21,6 +19,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Output standalone para melhor compatibilidade com Railway
+  output: "standalone",
 };
 
 export default nextConfig;
