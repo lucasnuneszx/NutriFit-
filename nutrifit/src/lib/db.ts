@@ -15,11 +15,11 @@ function getPool(): Pool {
     return pool;
   }
 
-  const connectionString = process.env.DATABASE_URL || 
-    `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASSWORD || ''}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'nutrifit'}`;
+  const connectionString = process.env.DATABASE_URL;
 
-  if (!process.env.DATABASE_URL) {
+  if (!connectionString) {
     console.error('[DB] DATABASE_URL não configurada!');
+    throw new Error('DATABASE_URL não está configurada. Configure no Railway Dashboard → Variables.');
   }
 
   pool = new Pool({

@@ -15,6 +15,18 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
+    // Verificar se DATABASE_URL está configurada
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        { 
+          ok: false, 
+          error: "database_url_not_configured",
+          message: "DATABASE_URL não está configurada. Configure no Railway Dashboard → Variables."
+        },
+        { status: 500 }
+      );
+    }
+
     // Verificar se há uma chave de segurança (opcional, mas recomendado)
     const { searchParams } = new URL(request.url);
     const secret = searchParams.get("secret");
