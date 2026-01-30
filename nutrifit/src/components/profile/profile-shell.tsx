@@ -118,7 +118,7 @@ export function ProfileShell() {
       
       if (data.ok && data.meals && Array.isArray(data.meals)) {
         const formattedMeals: MealPhoto[] = data.meals.map((meal) => ({
-          id: meal.id,
+          id: meal.id.toString(),
           url: meal.imagem_url,
           data: new Date(meal.criado_em).toLocaleDateString("pt-BR"),
           descricao: meal.descricao || "Refeição",
@@ -195,7 +195,7 @@ export function ProfileShell() {
       
       if (data.ok && data.meal) {
         const newMeal: MealPhoto = {
-          id: data.meal.id,
+          id: data.meal.id.toString(),
           url: data.meal.imagem_url,
           data: new Date(data.meal.criado_em).toLocaleDateString("pt-BR"),
           calorias: data.meal.calorias || 0,
