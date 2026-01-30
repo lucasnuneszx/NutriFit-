@@ -3,7 +3,7 @@
  * Substitui o Supabase por PostgreSQL direto
  */
 
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 let pool: Pool | null = null;
 
@@ -41,7 +41,7 @@ function getPool(): Pool {
 /**
  * Executa uma query SQL
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> {
