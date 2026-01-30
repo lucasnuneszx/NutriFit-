@@ -397,16 +397,29 @@ export class SyncPayClient {
  * Helper para criar cliente Sync Pay a partir de variáveis de ambiente
  */
 export function createSyncPayClient(): SyncPayClient | null {
-  const clientId = process.env.SYNC_PAY_CLIENT_ID;
-  const clientSecret = process.env.SYNC_PAY_CLIENT_SECRET;
-  const baseUrl = process.env.SYNC_PAY_BASE_URL;
+  const clientId = process.env.SYNC_PAY_CLIENT_ID?.trim();
+  const clientSecret = process.env.SYNC_PAY_CLIENT_SECRET?.trim();
+  const baseUrl = process.env.SYNC_PAY_BASE_URL?.trim();
 
   if (!clientId || !clientSecret) {
     console.error('[Sync Pay] ❌ SYNC_PAY_CLIENT_ID e SYNC_PAY_CLIENT_SECRET são obrigatórios');
     console.error('[Sync Pay] Configure no Railway Dashboard → Variables');
     console.error('[Sync Pay] 📋 Documentação: https://syncpay.apidog.io/');
+    console.error('[Sync Pay] 🔍 Valores atuais:', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      clientIdLength: clientId?.length || 0,
+      clientSecretLength: clientSecret?.length || 0,
+    });
     return null;
   }
+
+  // Log de confirmação (sem mostrar valores completos)
+  console.log('[Sync Pay] ✅ Credenciais carregadas:', {
+    clientIdPreview: `${clientId.substring(0, 8)}...${clientId.substring(clientId.length - 4)}`,
+    clientSecretPreview: `${clientSecret.substring(0, 8)}...${clientSecret.substring(clientSecret.length - 4)}`,
+    baseUrl: baseUrl || 'padrão',
+  });
 
   if (!baseUrl) {
     console.warn('[Sync Pay] ⚠️ SYNC_PAY_BASE_URL não configurada. Usando URL padrão.');
