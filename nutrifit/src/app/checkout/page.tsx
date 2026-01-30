@@ -124,7 +124,6 @@ export default function CheckoutPage() {
                 {!paymentSuccess ? (
                   <PixPayment
                     amount={3999} // Valor em centavos (R$ 39,99)
-                    description="Assinatura NutriPlus Mensal"
                     customerName={userName}
                     customerEmail="" // O email será preenchido no componente PixPayment
                     onPaymentSuccess={handlePaymentSuccess}
