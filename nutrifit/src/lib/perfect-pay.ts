@@ -66,7 +66,10 @@ export class PerfectPayClient {
    */
   async createPixPayment(request: CreatePixPaymentRequest): Promise<PerfectPayPixResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/payments/pix`, {
+      const url = `${this.baseUrl}/payments/pix`;
+      console.log('[Perfect Pay] Criando pagamento PIX:', { url, amount: request.amount });
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,17 +84,32 @@ export class PerfectPayClient {
         }),
       });
 
-      const data = await response.json();
-
+      // Verificar se a resposta é válida
       if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { message: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        console.error('[Perfect Pay] Erro na resposta:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        
         return {
           success: false,
           error: {
-            code: data.error?.code || 'UNKNOWN_ERROR',
-            message: data.error?.message || 'Erro ao criar pagamento PIX',
+            code: errorData.error?.code || `HTTP_${response.status}`,
+            message: errorData.error?.message || errorData.message || `Erro ${response.status}: ${response.statusText}`,
           },
         };
       }
+
+      const data = await response.json();
+      console.log('[Perfect Pay] Pagamento criado com sucesso:', { id: data.id });
 
       return {
         success: true,
@@ -107,11 +125,20 @@ export class PerfectPayClient {
       };
     } catch (error) {
       console.error('[Perfect Pay] Erro ao criar pagamento:', error);
+      
+      // Mensagens de erro mais específicas
+      let errorMessage = 'Erro de conexão';
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        errorMessage = 'Erro de conexão com a API. Verifique sua internet ou tente novamente.';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
       return {
         success: false,
         error: {
           code: 'NETWORK_ERROR',
-          message: error instanceof Error ? error.message : 'Erro de conexão',
+          message: errorMessage,
         },
       };
     }

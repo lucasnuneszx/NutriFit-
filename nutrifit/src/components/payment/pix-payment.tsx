@@ -45,16 +45,46 @@ export function PixPayment({ amount, plan, onSuccess, onCancel }: PixPaymentProp
         body: JSON.stringify({ plan, amount }),
       });
 
-      const data = await res.json();
+      // Verificar se a resposta é JSON válido
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        // Se não conseguir fazer parse do JSON, pode ser erro de rede
+        throw new Error(
+          res.status === 0 || !res.ok
+            ? "Erro de conexão. Verifique sua internet e tente novamente."
+            : "Erro ao processar resposta do servidor."
+        );
+      }
 
       if (!data.ok) {
-        throw new Error(data.message || "Erro ao criar pagamento");
+        // Mensagens de erro mais específicas
+        let errorMessage = data.message || data.error || "Erro ao criar pagamento";
+        
+        if (data.error === "perfect_pay_not_configured") {
+          errorMessage = "Perfect Pay não está configurado. Entre em contato com o suporte.";
+        } else if (data.error === "profile_not_found") {
+          errorMessage = "Perfil não encontrado. Complete seu cadastro primeiro.";
+        } else if (data.error === "perfect_pay_error") {
+          errorMessage = `Erro na Perfect Pay: ${data.message || "Tente novamente em alguns instantes."}`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      if (!data.payment) {
+        throw new Error("Resposta inválida do servidor. Tente novamente.");
       }
 
       setPaymentData(data.payment);
       startStatusCheck(data.payment.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido");
+      console.error("[PixPayment] Erro ao criar pagamento:", err);
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : "Erro desconhecido. Tente novamente ou entre em contato com o suporte.";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
