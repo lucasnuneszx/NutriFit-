@@ -24,15 +24,18 @@ export async function POST(request: Request) {
     // Validar Perfect Pay
     const perfectPay = createPerfectPayClient();
     if (!perfectPay) {
+      console.error("[Payment API] Perfect Pay não configurado. PERFECT_PAY_API_TOKEN ausente.");
       return NextResponse.json(
         {
           ok: false,
           error: "perfect_pay_not_configured",
-          message: "Perfect Pay não está configurado. Verifique as variáveis de ambiente.",
+          message: "Perfect Pay não está configurado. Verifique as variáveis de ambiente PERFECT_PAY_API_TOKEN.",
         },
         { status: 500 }
       );
     }
+    
+    console.log("[Payment API] Perfect Pay cliente criado com sucesso.");
 
     // Ler body
     let body: { plan?: "plus"; amount?: number } = {};

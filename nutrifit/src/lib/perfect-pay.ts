@@ -67,7 +67,25 @@ export class PerfectPayClient {
   async createPixPayment(request: CreatePixPaymentRequest): Promise<PerfectPayPixResponse> {
     try {
       const url = `${this.baseUrl}/payments/pix`;
-      console.log('[Perfect Pay] Criando pagamento PIX:', { url, amount: request.amount });
+      const payload = {
+        amount: request.amount,
+        description: request.description,
+        customer: request.customer,
+        metadata: request.metadata || {},
+        expires_in: request.expiresIn || 30, // 30 minutos padrão
+      };
+      
+      console.log('[Perfect Pay] Criando pagamento PIX:', { 
+        url, 
+        amount: request.amount,
+        baseUrl: this.baseUrl,
+        hasToken: !!this.apiToken,
+        tokenLength: this.apiToken?.length || 0,
+      });
+      
+      // Adicionar timeout de 30 segundos
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       const response = await fetch(url, {
         method: 'POST',
@@ -75,14 +93,11 @@ export class PerfectPayClient {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiToken}`,
         },
-        body: JSON.stringify({
-          amount: request.amount,
-          description: request.description,
-          customer: request.customer,
-          metadata: request.metadata || {},
-          expires_in: request.expiresIn || 30, // 30 minutos padrão
-        }),
+        body: JSON.stringify(payload),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       // Verificar se a resposta é válida
       if (!response.ok) {
@@ -124,20 +139,34 @@ export class PerfectPayClient {
         },
       };
     } catch (error) {
-      console.error('[Perfect Pay] Erro ao criar pagamento:', error);
+      console.error('[Perfect Pay] Erro ao criar pagamento:', {
+        error,
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        baseUrl: this.baseUrl,
+        url: `${this.baseUrl}/payments/pix`,
+      });
       
       // Mensagens de erro mais específicas
       let errorMessage = 'Erro de conexão';
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Erro de conexão com a API. Verifique sua internet ou tente novamente.';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      let errorCode = 'NETWORK_ERROR';
+      
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'Timeout: A requisição demorou muito. Tente novamente.';
+          errorCode = 'TIMEOUT_ERROR';
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+          errorMessage = `Erro de conexão com a API da Perfect Pay. Verifique se a URL está correta: ${this.baseUrl}`;
+          errorCode = 'NETWORK_ERROR';
+        } else {
+          errorMessage = error.message;
+        }
       }
       
       return {
         success: false,
         error: {
-          code: 'NETWORK_ERROR',
+          code: errorCode,
           message: errorMessage,
         },
       };
