@@ -95,6 +95,8 @@ export class SyncPayClient {
         baseUrl: this.baseUrl,
         hasClientId: !!this.clientId,
         hasClientSecret: !!this.clientSecret,
+        clientIdPreview: this.clientId ? `${this.clientId.substring(0, 8)}...` : 'NÃO CONFIGURADO',
+        clientSecretPreview: this.clientSecret ? `${this.clientSecret.substring(0, 8)}...` : 'NÃO CONFIGURADO',
       });
       
       const response = await fetch(authUrl, {
