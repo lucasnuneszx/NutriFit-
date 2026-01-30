@@ -127,7 +127,7 @@ function ProfileHeader({ isMobile = false }: { isMobile?: boolean }) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
     
     // Listener para quando o perfil é atualizado na página de perfil
-    const handleProfileUpdated = (event: CustomEvent<{ foto_url?: string }>) => {
+    const handleProfileUpdated = (event: CustomEvent<{ foto_url?: string; nome?: string }>) => {
       const updatedProfile = event.detail;
       if (updatedProfile?.foto_url) {
         setImageKey((prev) => prev + 1); // Force reload da imagem
@@ -136,7 +136,7 @@ function ProfileHeader({ isMobile = false }: { isMobile?: boolean }) {
           return {
             ...prev,
             foto_url: updatedProfile.foto_url ?? null,
-            nome: updatedProfile.nome || prev.nome,
+            nome: updatedProfile.nome ?? prev.nome,
           };
         });
       }
