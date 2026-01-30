@@ -242,14 +242,20 @@ export function createPerfectPayClient(): PerfectPayClient | null {
   const baseUrl = process.env.PERFECT_PAY_BASE_URL;
 
   if (!apiToken) {
-    console.error('[Perfect Pay] PERFECT_PAY_API_TOKEN é obrigatório');
+    console.error('[Perfect Pay] ❌ PERFECT_PAY_API_TOKEN é obrigatório');
+    console.error('[Perfect Pay] Configure no Railway Dashboard → Variables');
     return null;
   }
 
   // Avisar se a URL padrão está sendo usada (pode estar incorreta)
   if (!baseUrl) {
-    console.warn('[Perfect Pay] PERFECT_PAY_BASE_URL não configurada. Usando URL padrão que pode estar incorreta.');
-    console.warn('[Perfect Pay] Verifique a documentação da Perfect Pay e configure PERFECT_PAY_BASE_URL no Railway.');
+    console.error('[Perfect Pay] ⚠️ PERFECT_PAY_BASE_URL não configurada!');
+    console.error('[Perfect Pay] A URL padrão (api.perfectpay.com.br) NÃO EXISTE (erro DNS)');
+    console.error('[Perfect Pay] 📋 Acesse: app.perfectpay.com.br → Ferramentas → API');
+    console.error('[Perfect Pay] 📋 Encontre a URL correta e configure PERFECT_PAY_BASE_URL no Railway');
+    console.error('[Perfect Pay] 📋 Veja o arquivo: COMO_ENCONTRAR_URL_PERFECT_PAY.md');
+  } else {
+    console.log('[Perfect Pay] ✅ URL configurada:', baseUrl);
   }
 
   try {
