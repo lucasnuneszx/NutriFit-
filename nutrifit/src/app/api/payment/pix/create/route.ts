@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-server";
 import { query } from "@/lib/db";
-import { createIronPayClient } from "@/lib/iron-pay";
+import { createSyncPayClient } from "@/lib/sync-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Cria um pagamento PIX via Iron Pay
+ * Cria um pagamento PIX via Sync Pay
  * POST /api/payment/pix/create
  */
 export async function POST(request: Request) {
@@ -21,21 +21,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar Iron Pay
-    const ironPay = createIronPayClient();
-    if (!ironPay) {
-      console.error("[Payment API] Iron Pay não configurado. IRON_PAY_API_TOKEN ausente.");
+    // Validar Sync Pay
+    const syncPay = createSyncPayClient();
+    if (!syncPay) {
+      console.error("[Payment API] Sync Pay não configurado. SYNC_PAY_CLIENT_ID ou SYNC_PAY_CLIENT_SECRET ausente.");
       return NextResponse.json(
         {
           ok: false,
-          error: "iron_pay_not_configured",
-          message: "Iron Pay não está configurado. Verifique as variáveis de ambiente IRON_PAY_API_TOKEN.",
+          error: "sync_pay_not_configured",
+          message: "Sync Pay não está configurado. Verifique as variáveis de ambiente SYNC_PAY_CLIENT_ID e SYNC_PAY_CLIENT_SECRET.",
         },
         { status: 500 }
       );
     }
     
-    console.log("[Payment API] Iron Pay cliente criado com sucesso.");
+    console.log("[Payment API] Sync Pay cliente criado com sucesso.");
 
     // Ler body
     let body: { plan?: "plus"; amount?: number } = {};
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Criar pagamento PIX na Iron Pay
-    const pixResponse = await ironPay.createPixPayment({
+    // Criar pagamento PIX na Sync Pay
+    const pixResponse = await syncPay.createPixPayment({
       amount: amount,
       description: `NutriFit+ - Assinatura ${plan === "plus" ? "NutriPlus" : "Free"}`,
       customer: {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "iron_pay_error",
+          error: "sync_pay_error",
           message: pixResponse.error?.message || "Erro ao criar pagamento PIX",
         },
         { status: 500 }
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
           amount / 100, // Converter centavos para reais
           "pendente",
           "pix",
-          pixResponse.data.id, // ID da Iron Pay
+          pixResponse.data.id, // ID da Sync Pay
           `PIX - QR Code: ${pixResponse.data.id}`,
         ]
       );

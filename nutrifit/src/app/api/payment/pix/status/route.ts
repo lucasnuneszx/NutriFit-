@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-server";
 import { query } from "@/lib/db";
-import { createIronPayClient } from "@/lib/iron-pay";
+import { createSyncPayClient } from "@/lib/sync-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,22 +49,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // Verificar status na Iron Pay
-    const ironPay = createIronPayClient();
-    if (!ironPay) {
+    // Verificar status na Sync Pay
+    const syncPay = createSyncPayClient();
+    if (!syncPay) {
       return NextResponse.json(
-        { ok: false, error: "iron_pay_not_configured" },
+        { ok: false, error: "sync_pay_not_configured" },
         { status: 500 },
       );
     }
 
-    const statusResponse = await ironPay.checkPaymentStatus(paymentId);
+    const statusResponse = await syncPay.checkPaymentStatus(paymentId);
 
     if (!statusResponse.success || !statusResponse.data) {
       return NextResponse.json(
         {
           ok: false,
-          error: "iron_pay_error",
+          error: "sync_pay_error",
           message: statusResponse.error?.message,
         },
         { status: 500 },

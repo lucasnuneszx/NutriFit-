@@ -1,10 +1,12 @@
 /**
- * Iron Pay API Integration
- * Documentação: https://docs.ironpayapp.com.br/
+ * Sync Pay API Integration
+ * Documentação: https://syncpay.apidog.io/
+ * Base URL: https://api.syncpayments.com.br/
  */
 
-export interface IronPayConfig {
-  apiToken: string; // Token da Iron Pay
+export interface SyncPayConfig {
+  clientId: string; // Client ID (pública)
+  clientSecret: string; // Client Secret (privada)
   baseUrl?: string;
 }
 
@@ -21,10 +23,10 @@ export interface CreatePixPaymentRequest {
   expiresIn?: number; // Minutos até expirar (padrão: 30)
 }
 
-export interface IronPayPixResponse {
+export interface SyncPayPixResponse {
   success: boolean;
   data?: {
-    id: string; // ID da transação na Iron Pay
+    id: string; // ID da transação na Sync Pay
     qr_code: string; // QR Code PIX (base64 ou string)
     qr_code_url: string; // URL do QR Code
     copy_paste: string; // Código PIX para copiar e colar
@@ -52,33 +54,79 @@ export interface CheckPaymentStatusResponse {
   };
 }
 
-export class IronPayClient {
-  private apiToken: string;
+export class SyncPayClient {
+  private clientId: string;
+  private clientSecret: string;
   private baseUrl: string;
+  private accessToken: string | null = null;
+  private tokenExpiresAt: number = 0;
 
-  constructor(config: IronPayConfig) {
-    this.apiToken = config.apiToken;
-    // URL base da API Iron Pay (conforme documentação oficial)
-    // Documentação: https://docs.ironpayapp.com.br/
-    this.baseUrl = config.baseUrl || 'https://api.ironpayapp.com.br/v1';
+  constructor(config: SyncPayConfig) {
+    this.clientId = config.clientId;
+    this.clientSecret = config.clientSecret;
+    // URL base da API Sync Pay (conforme documentação oficial)
+    // Documentação: https://syncpay.apidog.io/
+    this.baseUrl = config.baseUrl || 'https://api.syncpayments.com.br';
     
     if (!this.baseUrl.startsWith('http://') && !this.baseUrl.startsWith('https://')) {
-      throw new Error('IRON_PAY_BASE_URL deve começar com http:// ou https://');
+      throw new Error('SYNC_PAY_BASE_URL deve começar com http:// ou https://');
+    }
+  }
+
+  /**
+   * Obtém token de acesso OAuth2
+   */
+  private async getAccessToken(): Promise<string> {
+    // Verificar se o token ainda é válido (com margem de 5 minutos)
+    if (this.accessToken && Date.now() < this.tokenExpiresAt - 5 * 60 * 1000) {
+      return this.accessToken;
+    }
+
+    try {
+      const response = await fetch(`${this.baseUrl}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          client_id: this.clientId,
+          client_secret: this.clientSecret,
+          grant_type: 'client_credentials',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`Erro ao obter token: ${errorData.error || response.statusText}`);
+      }
+
+      const data = await response.json();
+      this.accessToken = data.access_token;
+      // Token geralmente expira em 3600 segundos (1 hora)
+      this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+
+      return this.accessToken;
+    } catch (error) {
+      console.error('[Sync Pay] Erro ao obter token:', error);
+      throw error;
     }
   }
 
   /**
    * Cria um pagamento PIX
    */
-  async createPixPayment(request: CreatePixPaymentRequest): Promise<IronPayPixResponse> {
+  async createPixPayment(request: CreatePixPaymentRequest): Promise<SyncPayPixResponse> {
     try {
+      // Obter token de acesso
+      const token = await this.getAccessToken();
+
       // Endpoint para criar pagamento PIX
-      // Verificar na documentação da Iron Pay o endpoint correto
+      // Verificar na documentação da Sync Pay o endpoint correto
       // Possíveis endpoints:
-      // - /pix
-      // - /payments/pix
-      // - /transactions/pix
-      const url = `${this.baseUrl}/pix`;
+      // - /v1/pix
+      // - /v1/payments/pix
+      // - /v1/transactions/pix
+      const url = `${this.baseUrl}/v1/pix`;
       
       const payload = {
         amount: request.amount,
@@ -88,13 +136,13 @@ export class IronPayClient {
         expires_in: request.expiresIn || 30, // 30 minutos padrão
       };
       
-      console.log('[Iron Pay] Criando pagamento PIX:', { 
+      console.log('[Sync Pay] Criando pagamento PIX:', { 
         url, 
         fullUrl: url,
         amount: request.amount,
         baseUrl: this.baseUrl,
-        hasToken: !!this.apiToken,
-        tokenLength: this.apiToken?.length || 0,
+        hasClientId: !!this.clientId,
+        hasClientSecret: !!this.clientSecret,
         payload: payload,
       });
       
@@ -106,7 +154,7 @@ export class IronPayClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -128,7 +176,7 @@ export class IronPayClient {
           };
         }
         
-        console.error('[Iron Pay] Erro na resposta:', {
+        console.error('[Sync Pay] Erro na resposta:', {
           status: response.status,
           statusText: response.statusText,
           url: url,
@@ -146,7 +194,7 @@ export class IronPayClient {
       }
 
       const data = await response.json();
-      console.log('[Iron Pay] Pagamento criado com sucesso:', { id: data.id });
+      console.log('[Sync Pay] Pagamento criado com sucesso:', { id: data.id });
 
       return {
         success: true,
@@ -161,12 +209,12 @@ export class IronPayClient {
         },
       };
     } catch (error) {
-      console.error('[Iron Pay] Erro ao criar pagamento:', {
+      console.error('[Sync Pay] Erro ao criar pagamento:', {
         error,
         errorType: error?.constructor?.name,
         errorMessage: error instanceof Error ? error.message : String(error),
         baseUrl: this.baseUrl,
-        url: `${this.baseUrl}/pix`,
+        url: `${this.baseUrl}/v1/pix`,
       });
       
       // Mensagens de erro mais específicas
@@ -178,7 +226,7 @@ export class IronPayClient {
           errorMessage = 'Timeout: A requisição demorou muito. Tente novamente.';
           errorCode = 'TIMEOUT_ERROR';
         } else if (error.message.includes('fetch') || error.message.includes('network')) {
-          errorMessage = `Erro de conexão com a API da Iron Pay. Verifique se a URL está correta: ${this.baseUrl}`;
+          errorMessage = `Erro de conexão com a API da Sync Pay. Verifique se a URL está correta: ${this.baseUrl}`;
           errorCode = 'NETWORK_ERROR';
         } else {
           errorMessage = error.message;
@@ -200,10 +248,11 @@ export class IronPayClient {
    */
   async checkPaymentStatus(paymentId: string): Promise<CheckPaymentStatusResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/payments/${paymentId}`, {
+      const token = await this.getAccessToken();
+      const response = await fetch(`${this.baseUrl}/v1/payments/${paymentId}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.apiToken}`,
+          'Authorization': `Bearer ${token}`,
         },
       });
 
@@ -229,7 +278,7 @@ export class IronPayClient {
         },
       };
     } catch (error) {
-      console.error('[Iron Pay] Erro ao verificar pagamento:', error);
+      console.error('[Sync Pay] Erro ao verificar pagamento:', error);
       return {
         success: false,
         error: {
@@ -244,39 +293,43 @@ export class IronPayClient {
    * Valida webhook signature (segurança)
    */
   validateWebhookSignature(payload: string, signature: string): boolean {
-    // Implementar validação de assinatura se a Iron Pay fornecer
+    // Implementar validação de assinatura se a Sync Pay fornecer
     // Por enquanto, retorna true (implementar quando tiver a documentação)
     return true;
   }
 }
 
 /**
- * Helper para criar cliente Iron Pay a partir de variáveis de ambiente
+ * Helper para criar cliente Sync Pay a partir de variáveis de ambiente
  */
-export function createIronPayClient(): IronPayClient | null {
-  const apiToken = process.env.IRON_PAY_API_TOKEN;
-  const baseUrl = process.env.IRON_PAY_BASE_URL;
+export function createSyncPayClient(): SyncPayClient | null {
+  const clientId = process.env.SYNC_PAY_CLIENT_ID;
+  const clientSecret = process.env.SYNC_PAY_CLIENT_SECRET;
+  const baseUrl = process.env.SYNC_PAY_BASE_URL;
 
-  if (!apiToken) {
-    console.error('[Iron Pay] ❌ IRON_PAY_API_TOKEN é obrigatório');
-    console.error('[Iron Pay] Configure no Railway Dashboard → Variables');
+  if (!clientId || !clientSecret) {
+    console.error('[Sync Pay] ❌ SYNC_PAY_CLIENT_ID e SYNC_PAY_CLIENT_SECRET são obrigatórios');
+    console.error('[Sync Pay] Configure no Railway Dashboard → Variables');
+    console.error('[Sync Pay] 📋 Documentação: https://syncpay.apidog.io/');
     return null;
   }
 
   if (!baseUrl) {
-    console.warn('[Iron Pay] ⚠️ IRON_PAY_BASE_URL não configurada. Usando URL padrão.');
-    console.warn('[Iron Pay] 📋 Verifique a documentação: https://docs.ironpayapp.com.br/');
+    console.warn('[Sync Pay] ⚠️ SYNC_PAY_BASE_URL não configurada. Usando URL padrão.');
+    console.warn('[Sync Pay] 📋 URL padrão: https://api.syncpayments.com.br');
+    console.warn('[Sync Pay] 📋 Documentação: https://syncpay.apidog.io/');
   } else {
-    console.log('[Iron Pay] ✅ URL configurada:', baseUrl);
+    console.log('[Sync Pay] ✅ URL configurada:', baseUrl);
   }
 
   try {
-    return new IronPayClient({
-      apiToken,
+    return new SyncPayClient({
+      clientId,
+      clientSecret,
       baseUrl,
     });
   } catch (error) {
-    console.error('[Iron Pay] Erro ao criar cliente:', error);
+    console.error('[Sync Pay] Erro ao criar cliente:', error);
     return null;
   }
 }

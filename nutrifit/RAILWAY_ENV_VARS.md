@@ -16,9 +16,10 @@ JWT_SECRET=seu-secret-super-seguro-aqui-mude-em-producao-123456789
 GEMINI_API_KEY=sua-chave-gemini-aqui
 GEMINI_MODEL=gemini-3-flash-preview
 
-# Iron Pay API (Pagamentos PIX)
-IRON_PAY_API_TOKEN=seu-token-iron-pay-aqui
-IRON_PAY_BASE_URL=https://api.ironpayapp.com.br/v1
+# Sync Pay API (Pagamentos PIX)
+SYNC_PAY_CLIENT_ID=seu-client-id-sync-pay-aqui
+SYNC_PAY_CLIENT_SECRET=seu-client-secret-sync-pay-aqui
+SYNC_PAY_BASE_URL=https://api.syncpayments.com.br
 ```
 
 ## 📝 Como obter cada variável:
@@ -41,16 +42,17 @@ IRON_PAY_BASE_URL=https://api.ironpayapp.com.br/v1
 - Crie uma nova API Key
 - Cole aqui
 
-### 4. IRON_PAY_API_TOKEN
-- Acesse o painel da Iron Pay
-- Vá em: Configurações → API → Token
-- Copie o token
-- **Documentação:** https://docs.ironpayapp.com.br/
+### 4. SYNC_PAY_CLIENT_ID e SYNC_PAY_CLIENT_SECRET
+- Acesse o painel da Sync Pay
+- Vá em: Chaves API → Criar nova chave
+- Copie o **Client ID (pública)** e o **Client Secret (privada)**
+- ⚠️ **ATENÇÃO:** O Client Secret é exibido apenas uma vez! Salve em local seguro.
+- **Documentação:** https://syncpay.apidog.io/
 
-### 5. IRON_PAY_BASE_URL
-- Verifique na documentação: https://docs.ironpayapp.com.br/
-- URL padrão: `https://api.ironpayapp.com.br/v1`
+### 5. SYNC_PAY_BASE_URL
+- URL padrão: `https://api.syncpayments.com.br`
 - Se a documentação indicar outra URL, use a da documentação
+- **Documentação:** https://syncpay.apidog.io/
 
 ## 🚀 Após configurar as variáveis:
 

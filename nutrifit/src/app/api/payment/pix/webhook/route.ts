@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Webhook da Iron Pay para receber confirmações de pagamento
+ * Webhook da Sync Pay para receber confirmações de pagamento
  * POST /api/payment/pix/webhook
  */
 export async function POST(request: Request) {
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Buscar transação pelo ID externo (Iron Pay)
+    // Buscar transação pelo ID externo (Sync Pay)
     const transactionResult = await query<{ id: number; user_id: string; plano: string; status: string }>(
       `SELECT id, user_id, plano, status
        FROM transactions
