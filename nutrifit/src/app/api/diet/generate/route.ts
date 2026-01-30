@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { getCurrentUser } from "@/lib/auth-server";
+import { query } from "@/lib/db";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
@@ -22,14 +22,9 @@ type DietResult = {
 };
 
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const modelName = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
   if (!geminiKey) {
     return NextResponse.json(
       { ok: false, error: "missing_gemini_key" },
@@ -37,21 +32,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
@@ -66,11 +47,12 @@ export async function POST(request: Request) {
   const parsed = body as Partial<{ goal: Goal }>;
   const goal: Goal = parsed.goal === "bulking" ? "bulking" : "cutting";
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("nome,nome_assistente,tipo_plano")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Buscar perfil
+  const profileResult = await query<{ nome: string | null; nome_assistente: string | null; tipo_plano: string }>(
+    `SELECT nome, nome_assistente, tipo_plano FROM profiles WHERE id = $1`,
+    [user.id]
+  );
+  const profile = profileResult.rows[0];
 
   const plan = profile?.tipo_plano === "plus" ? "plus" : "free";
   if (plan !== "plus") {
@@ -80,11 +62,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: bio } = await supabase
-    .from("biometrics")
-    .select("peso,altura,idade,genero,nivel_atividade,condicoes_medicas")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  // Buscar biometria
+  const bioResult = await query<{
+    peso: number | null;
+    altura: number | null;
+    idade: number | null;
+    genero: string | null;
+    nivel_atividade: string | null;
+    condicoes_medicas: Record<string, unknown> | null;
+  }>(
+    `SELECT peso, altura, idade, genero, nivel_atividade, condicoes_medicas FROM biometrics WHERE user_id = $1`,
+    [user.id]
+  );
+  const bio = bioResult.rows[0];
 
   const name = profile?.nome ?? "";
   const assistant = profile?.nome_assistente ?? "Athena";
@@ -197,25 +187,26 @@ Retorne APENAS um JSON válido (sem markdown, sem código, apenas o JSON) com es
       );
     }
 
-    const insert = await supabase.from("diet_plans").insert({
-      user_id: user.id,
-      goal: dietResult.goal,
-      calories_target: Math.round(dietResult.calories_target),
-      protein_g: Math.round(dietResult.macros.protein_g),
-      carbs_g: Math.round(dietResult.macros.carbs_g),
-      fats_g: Math.round(dietResult.macros.fats_g),
-      plan: { meals: dietResult.meals, notes: dietResult.notes },
-      groceries: dietResult.groceries,
-    }).select("id,goal,calories_target,protein_g,carbs_g,fats_g,plan,groceries,created_at").single();
+    // Salvar no banco de dados
+    const insertResult = await query(
+      `INSERT INTO diet_plans (user_id, goal, calories_target, protein_g, carbs_g, fats_g, plan, groceries)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, goal, calories_target, protein_g, carbs_g, fats_g, plan, groceries, created_at`,
+      [
+        user.id,
+        dietResult.goal,
+        Math.round(dietResult.calories_target),
+        Math.round(dietResult.macros.protein_g),
+        Math.round(dietResult.macros.carbs_g),
+        Math.round(dietResult.macros.fats_g),
+        JSON.stringify({ meals: dietResult.meals, notes: dietResult.notes }),
+        JSON.stringify(dietResult.groceries),
+      ]
+    );
 
-    if (insert.error) {
-      return NextResponse.json(
-        { ok: false, error: "db_error", details: insert.error.message },
-        { status: 500 },
-      );
-    }
+    const saved = insertResult.rows[0];
 
-    return NextResponse.json({ ok: true, saved: insert.data });
+    return NextResponse.json({ ok: true, saved });
   } catch (error) {
     console.error("Erro na geração de dieta:", error);
     const errorMsg = error instanceof Error ? error.message : String(error);
@@ -241,25 +232,4 @@ Retorne APENAS um JSON válido (sem markdown, sem código, apenas o JSON) com es
       { status: 500 },
     );
   }
-
-  const insert = await supabase.from("diet_plans").insert({
-    user_id: user.id,
-    goal: result.goal,
-    calories_target: Math.round(result.calories_target),
-    protein_g: Math.round(result.macros.protein_g),
-    carbs_g: Math.round(result.macros.carbs_g),
-    fats_g: Math.round(result.macros.fats_g),
-    plan: { meals: result.meals, notes: result.notes },
-    groceries: result.groceries,
-  }).select("id,goal,calories_target,protein_g,carbs_g,fats_g,plan,groceries,created_at").single();
-
-  if (insert.error) {
-    return NextResponse.json(
-      { ok: false, error: "db_error", details: insert.error.message },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({ ok: true, saved: insert.data });
 }
-
