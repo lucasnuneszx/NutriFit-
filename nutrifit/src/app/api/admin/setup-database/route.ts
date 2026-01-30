@@ -46,7 +46,11 @@ export async function GET(request: Request) {
       );
     }
 
-    const sql = fs.readFileSync(sqlFilePath, "utf8");
+    let sql = fs.readFileSync(sqlFilePath, "utf8");
+
+    // Remover comentários de linha (-- até o fim da linha)
+    // Mas preservar dentro de blocos $$ ... $$
+    sql = sql.replace(/--.*$/gm, "");
 
     // Executar o SQL
     // Dividir em comandos individuais de forma inteligente
@@ -55,31 +59,9 @@ export async function GET(request: Request) {
     let currentCommand = "";
     let inDollarQuote = false;
     let dollarTag = "";
-    let inComment = false;
 
     for (let i = 0; i < sql.length; i++) {
       const char = sql[i];
-      const nextChar = sql[i + 1];
-
-      // Detectar comentários de linha (--)
-      if (char === "-" && nextChar === "-" && !inDollarQuote) {
-        inComment = true;
-        currentCommand += char;
-        i++; // Pular o próximo -
-        continue;
-      }
-
-      // Detectar fim de comentário de linha
-      if (inComment && char === "\n") {
-        inComment = false;
-        currentCommand += char;
-        continue;
-      }
-
-      if (inComment) {
-        currentCommand += char;
-        continue;
-      }
 
       // Detectar início de bloco $$ ... $$
       if (char === "$" && !inDollarQuote) {
@@ -107,14 +89,8 @@ export async function GET(request: Request) {
       // Se encontrou ; e não está dentro de um bloco $$, é fim de comando
       if (char === ";" && !inDollarQuote) {
         const trimmed = currentCommand.trim();
-        // Filtrar: não vazio, não é só comentário, não começa com --
-        if (trimmed.length > 0 && 
-            !trimmed.startsWith("--") && 
-            !trimmed.match(/^[\s-]*$/) &&
-            trimmed.split("\n").some(line => {
-              const cleanLine = line.trim();
-              return cleanLine.length > 0 && !cleanLine.startsWith("--");
-            })) {
+        // Filtrar: não vazio e tem conteúdo válido
+        if (trimmed.length > 0) {
           commands.push(trimmed);
         }
         currentCommand = "";
@@ -123,27 +99,18 @@ export async function GET(request: Request) {
 
     // Adicionar último comando se houver
     const trimmed = currentCommand.trim();
-    if (trimmed.length > 0 && 
-        !trimmed.startsWith("--") && 
-        !trimmed.match(/^[\s-]*$/) &&
-        trimmed.split("\n").some(line => {
-          const cleanLine = line.trim();
-          return cleanLine.length > 0 && !cleanLine.startsWith("--");
-        })) {
+    if (trimmed.length > 0) {
       commands.push(trimmed);
     }
 
-    // Filtrar comandos que são apenas comentários ou vazios
-    const validCommands = commands.filter(cmd => {
-      const lines = cmd.split("\n");
-      const hasValidSQL = lines.some(line => {
-        const clean = line.trim();
-        return clean.length > 0 && 
-               !clean.startsWith("--") && 
-               !clean.match(/^[\s-]*$/);
+    // Filtrar comandos que são apenas espaços em branco ou vazios
+    const validCommands = commands
+      .map(cmd => cmd.trim())
+      .filter(cmd => {
+        // Remover linhas vazias e verificar se sobra algo
+        const lines = cmd.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        return lines.length > 0;
       });
-      return hasValidSQL;
-    });
 
     const results = [];
     let successCount = 0;
@@ -172,7 +139,7 @@ export async function GET(request: Request) {
       ok: true,
       message: "Setup do banco de dados concluído",
       summary: {
-        total: commands.length,
+        total: validCommands.length,
         success: successCount,
         errors: errorCount,
       },
