@@ -1,5 +1,5 @@
-[providers]
-node = "20"
+[variables]
+NODE_VERSION = "20"
 
 [phases.install]
 cmds = ["cd nutrifit && npm install"]
