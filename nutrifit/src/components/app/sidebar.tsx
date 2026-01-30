@@ -135,7 +135,7 @@ function ProfileHeader({ isMobile = false }: { isMobile?: boolean }) {
           if (!prev) return prev;
           return {
             ...prev,
-            foto_url: updatedProfile.foto_url,
+            foto_url: updatedProfile.foto_url ?? null,
             nome: updatedProfile.nome || prev.nome,
           };
         });
