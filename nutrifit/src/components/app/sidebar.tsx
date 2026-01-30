@@ -593,7 +593,7 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-black">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:z-50">
         <div className="flex flex-col flex-grow border-r border-cyber-glass-border bg-cyber-glass/10 backdrop-blur-xl">
@@ -747,8 +747,8 @@ export function Sidebar({ children }: { children: React.ReactNode }) {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className="flex-1 lg:pl-64 w-full overflow-x-hidden flex flex-col">
-        <div className="flex-1 min-h-screen pt-20 lg:pt-0 px-4 sm:px-6 lg:px-8">{children}</div>
+      <div className="flex-1 lg:pl-64 w-full overflow-x-hidden flex flex-col bg-black">
+        <div className="flex-1 min-h-screen pt-20 lg:pt-0 px-4 sm:px-6 lg:px-8 bg-black">{children}</div>
         <Footer />
       </div>
     </div>

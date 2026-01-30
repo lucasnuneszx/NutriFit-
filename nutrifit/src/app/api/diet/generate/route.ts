@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,15 +24,15 @@ type DietResult = {
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const openaiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_VISION_MODEL || "gpt-4o";
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const modelName = process.env.GEMINI_MODEL || "gemini-3-flash-preview";
 
   if (!url || !anonKey) {
     return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
   }
-  if (!openaiKey) {
+  if (!geminiKey) {
     return NextResponse.json(
-      { ok: false, error: "missing_openai_key" },
+      { ok: false, error: "missing_gemini_key" },
       { status: 500 },
     );
   }
@@ -89,95 +89,158 @@ export async function POST(request: Request) {
   const name = profile?.nome ?? "";
   const assistant = profile?.nome_assistente ?? "Athena";
 
-  const client = new OpenAI({ apiKey: openaiKey });
-
-  const system = [
-    "Você é uma nutricionista e coach de performance (tom cyber-sport, direto e motivador).",
-    "Gere um plano alimentar de 1 dia + lista de compras, baseado em objetivo e biometria.",
-    "Retorne SOMENTE JSON válido, sem markdown.",
-    "Se biometria estiver incompleta, faça suposições conservadoras e explique em notes.",
-    "Formato: goal, calories_target, macros{protein_g,carbs_g,fats_g}, meals[{title,items[],notes}], groceries[], notes.",
-  ].join("\n");
-
-  const prompt = {
-    user: { nome: name, email: user.email ?? "" },
-    assistant: { nickname: assistant },
-    goal,
-    biometrics: {
-      peso: bio?.peso ?? null,
-      altura: bio?.altura ?? null,
-      idade: bio?.idade ?? null,
-      genero: bio?.genero ?? null,
-      nivel_atividade: bio?.nivel_atividade ?? null,
-      condicoes_medicas: bio?.condicoes_medicas ?? {},
-    },
-  };
-
-  const completion = await client.chat.completions.create({
-    model,
-    temperature: 0.35,
-    response_format: {
-      type: "json_schema",
-      json_schema: {
-        name: "diet_plan",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["goal", "calories_target", "macros", "meals", "groceries", "notes"],
-          properties: {
-            goal: { type: "string", enum: ["cutting", "bulking"] },
-            calories_target: { type: "number" },
-            macros: {
-              type: "object",
-              additionalProperties: false,
-              required: ["protein_g", "carbs_g", "fats_g"],
-              properties: {
-                protein_g: { type: "number" },
-                carbs_g: { type: "number" },
-                fats_g: { type: "number" },
-              },
-            },
-            meals: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["title", "items", "notes"],
-                properties: {
-                  title: { type: "string" },
-                  items: { type: "array", items: { type: "string" } },
-                  notes: { type: "string" },
-                },
-              },
-            },
-            groceries: { type: "array", items: { type: "string" } },
-            notes: { type: "string" },
-          },
-        },
-      },
-    },
-    messages: [
-      { role: "system", content: system },
-      {
-        role: "user",
-        content: `Gere a dieta para ${name || "o usuário"} (assistente: ${assistant}). Contexto JSON:\n${JSON.stringify(prompt)}`,
-      },
-    ],
-  });
-
-  const raw = completion.choices[0]?.message?.content ?? "";
-  let result: DietResult | null = null;
-  try {
-    result = JSON.parse(raw) as DietResult;
-  } catch {
-    result = null;
+  // Inicializa o cliente Gemini
+  const genAI = new GoogleGenerativeAI(geminiKey);
+  
+  // Construir prompt detalhado baseado no perfil e objetivo
+  const peso = bio?.peso ?? null;
+  const altura = bio?.altura ?? null;
+  const idade = bio?.idade ?? null;
+  const genero = bio?.genero ?? null;
+  const nivelAtividade = bio?.nivel_atividade ?? null;
+  
+  // Calcular IMC se tiver peso e altura
+  let imc = null;
+  if (peso && altura) {
+    const alturaMetros = altura / 100;
+    imc = peso / (alturaMetros * alturaMetros);
   }
 
-  if (!result) {
+  const goalText = goal === "cutting" ? "CUTTING (perda de gordura e definição)" : "BULKING (ganho de massa muscular)";
+  
+  const prompt = `Você é uma nutricionista esportiva de elite e coach de performance (tom cyber-sport, direto e motivador).
+
+Crie uma dieta personalizada para uma pessoa com os seguintes dados:
+- Nome: ${name || "Atleta"}
+- Objetivo: ${goalText}
+- Peso: ${peso ? `${peso}kg` : "não informado"}
+- Altura: ${altura ? `${altura}cm` : "não informado"}
+- Idade: ${idade ? `${idade} anos` : "não informado"}
+- Gênero: ${genero || "não informado"}
+- Nível de atividade: ${nivelAtividade || "não informado"}
+${imc ? `- IMC: ${imc.toFixed(1)}` : ""}
+
+INSTRUÇÕES:
+1. Calcule as calorias diárias necessárias baseado no objetivo (${goalText})
+2. Distribua os macronutrientes adequadamente para o objetivo
+3. Crie um plano alimentar completo para 1 dia com pelo menos 4-5 refeições
+4. Inclua lista de compras com todos os ingredientes necessários
+5. Se algum dado estiver faltando, faça suposições conservadoras baseadas em padrões saudáveis e explique em "notes"
+
+Retorne APENAS um JSON válido (sem markdown, sem código, apenas o JSON) com esta estrutura exata:
+{
+  "goal": "${goal}",
+  "calories_target": <número>,
+  "macros": {
+    "protein_g": <número>,
+    "carbs_g": <número>,
+    "fats_g": <número>
+  },
+  "meals": [
+    {
+      "title": "Nome da refeição",
+      "items": ["item 1", "item 2", "..."],
+      "notes": "Observações sobre esta refeição"
+    }
+  ],
+  "groceries": ["item 1", "item 2", "..."],
+  "notes": "Observações gerais sobre a dieta e recomendações"
+}`;
+
+  const model = genAI.getGenerativeModel({ 
+    model: modelName,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 2000,
+      responseMimeType: "application/json",
+    },
+    systemInstruction: {
+      parts: [{ text: "Você é uma nutricionista esportiva especializada em dietas de alta performance. Sempre retorne JSON válido e estruturado." }],
+    },
+  });
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    
+    if (!response) {
+      throw new Error("Resposta vazia do Gemini");
+    }
+
+    const raw = response.text();
+    
+    if (!raw || raw.trim().length === 0) {
+      throw new Error("Resposta do Gemini está vazia");
+    }
+    
+    let dietResult: DietResult | null = null;
+    try {
+      dietResult = JSON.parse(raw) as DietResult;
+    } catch (parseError) {
+      // Tentar extrair JSON se vier com markdown ou código
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          dietResult = JSON.parse(jsonMatch[0]) as DietResult;
+        } catch (e) {
+          console.error("Erro ao parsear JSON extraído:", e);
+          throw new Error(`Erro ao parsear JSON: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else {
+        throw new Error(`Resposta não contém JSON válido. Resposta recebida: ${raw.substring(0, 200)}`);
+      }
+    }
+
+    if (!dietResult || !dietResult.goal || !dietResult.calories_target || !dietResult.macros || !dietResult.meals) {
+      console.error("Dieta inválida recebida:", dietResult);
+      return NextResponse.json(
+        { ok: false, error: "gemini_invalid_json", raw: raw.substring(0, 500) },
+        { status: 502 },
+      );
+    }
+
+    const insert = await supabase.from("diet_plans").insert({
+      user_id: user.id,
+      goal: dietResult.goal,
+      calories_target: Math.round(dietResult.calories_target),
+      protein_g: Math.round(dietResult.macros.protein_g),
+      carbs_g: Math.round(dietResult.macros.carbs_g),
+      fats_g: Math.round(dietResult.macros.fats_g),
+      plan: { meals: dietResult.meals, notes: dietResult.notes },
+      groceries: dietResult.groceries,
+    }).select("id,goal,calories_target,protein_g,carbs_g,fats_g,plan,groceries,created_at").single();
+
+    if (insert.error) {
+      return NextResponse.json(
+        { ok: false, error: "db_error", details: insert.error.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ ok: true, saved: insert.data });
+  } catch (error) {
+    console.error("Erro na geração de dieta:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // Verificar se é erro de autenticação
+    if (errorMsg.includes("API_KEY") || errorMsg.includes("401") || errorMsg.includes("403")) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "gemini_auth_error",
+          message: "Chave da API Gemini inválida ou ausente. Verifique GEMINI_API_KEY no .env.local",
+        },
+        { status: 500 },
+      );
+    }
+
     return NextResponse.json(
-      { ok: false, error: "openai_invalid_json", raw },
-      { status: 502 },
+      {
+        ok: false,
+        error: "gemini_error",
+        message: `Erro na API Gemini: ${errorMsg}`,
+      },
+      { status: 500 },
     );
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   Activity,
@@ -37,28 +38,28 @@ function Glow({ className }: { className?: string }) {
 function LiveScanCard() {
   return (
     <TiltCard className="group relative" shine>
-      <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/60 p-5 backdrop-blur-xl">
+      <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/60 p-4 sm:p-5 backdrop-blur-xl">
         <Glow />
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="relative grid h-9 w-9 place-items-center rounded-xl border border-cyber-glass-border bg-black/20">
-              <ScanLine className="h-5 w-5 text-neon-cyan" />
+            <div className="relative grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-xl border border-cyber-glass-border bg-black/20">
+              <ScanLine className="h-4 w-4 sm:h-5 sm:w-5 text-neon-cyan" />
               <div className="absolute -inset-2 rounded-2xl opacity-40 blur-md [background:radial-gradient(circle_at_center,color-mix(in_oklab,var(--neon-cyan)_55%,transparent),transparent_65%)]" />
             </div>
             <div>
-              <div className="text-sm font-semibold tracking-tight">
+              <div className="text-xs sm:text-sm font-semibold tracking-tight">
                 Vision AI Scan
               </div>
             </div>
           </div>
-          <Badge className="border-cyber-glass-border bg-black/30 text-neon-green">
+          <Badge className="border-cyber-glass-border bg-black/30 text-neon-green text-xs px-2 py-0.5">
             ONLINE
           </Badge>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="relative overflow-hidden rounded-2xl border border-cyber-glass-border bg-black/30">
+        <div className="mt-3 sm:mt-4 grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-cyber-glass-border bg-black/30">
             <div className="absolute inset-0 opacity-70 [background:radial-gradient(600px_circle_at_20%_15%,color-mix(in_oklab,var(--neon-violet)_22%,transparent),transparent_55%),radial-gradient(600px_circle_at_75%_60%,color-mix(in_oklab,var(--neon-cyan)_18%,transparent),transparent_55%)]" />
             <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(to_right,var(--cyber-grid)_1px,transparent_1px),linear-gradient(to_bottom,var(--cyber-grid)_1px,transparent_1px)] [background-size:28px_28px]" />
 
@@ -73,31 +74,31 @@ function LiveScanCard() {
               }}
             />
 
-            <div className="relative p-5">
-              <div className="text-xs font-medium tracking-wide text-muted-foreground">
+            <div className="relative p-4 sm:p-5">
+              <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 PRATO DETECTADO
               </div>
-              <div className="mt-2 text-2xl font-semibold tracking-tight">
+              <div className="mt-2 text-xl sm:text-2xl font-semibold tracking-tight">
                 Bowl Proteico
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge className="border-cyber-glass-border bg-black/20">
+              <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5 sm:gap-2">
+                <Badge className="border-cyber-glass-border bg-black/20 text-xs px-2.5 py-1">
                   frango grelhado
                 </Badge>
-                <Badge className="border-cyber-glass-border bg-black/20">
+                <Badge className="border-cyber-glass-border bg-black/20 text-xs px-2.5 py-1">
                   arroz
                 </Badge>
-                <Badge className="border-cyber-glass-border bg-black/20">
+                <Badge className="border-cyber-glass-border bg-black/20 text-xs px-2.5 py-1">
                   legumes
                 </Badge>
-                <Badge className="border-cyber-glass-border bg-black/20">
+                <Badge className="border-cyber-glass-border bg-black/20 text-xs px-2.5 py-1">
                   azeite
                 </Badge>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid gap-2 sm:gap-3 grid-cols-2 lg:grid-cols-1">
             <Macro
               label="Calorias"
               value="610"
@@ -125,23 +126,23 @@ function LiveScanCard() {
           </div>
         </div>
 
-        <Separator className="my-4 bg-white/10" />
+        <Separator className="my-3 sm:my-4 bg-white/10" />
 
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.25, duration: 0.6 }}
-          className="flex items-start gap-3"
+          className="flex items-start gap-2 sm:gap-3"
         >
-          <div className="mt-1 grid h-8 w-8 place-items-center rounded-xl border border-cyber-glass-border bg-black/25">
-            <BrainCircuit className="h-4 w-4 text-neon-cyan" />
+          <div className="mt-0.5 sm:mt-1 grid h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 place-items-center rounded-lg sm:rounded-xl border border-cyber-glass-border bg-black/25 flex-shrink-0">
+            <BrainCircuit className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-neon-cyan" />
           </div>
-          <div className="text-sm leading-relaxed text-muted-foreground">
-            <span className="text-foreground">
-              “Mandou bem demais, Lucas!”
+          <div className="text-xs sm:text-sm leading-relaxed text-muted-foreground">
+            <span className="text-foreground font-medium">
+              "Mandou bem demais, Lucas!"
             </span>{" "}
             Combustível puro. Quer que eu ajuste isso pro seu objetivo de{" "}
-            <span className="text-neon-green">cutting</span>?
+            <span className="text-neon-green font-semibold">cutting</span>?
           </div>
         </motion.div>
       </Card>
@@ -170,7 +171,7 @@ function Macro({
           : "text-neon-violet";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-cyber-glass-border bg-black/25 p-4">
+    <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-cyber-glass-border bg-black/25 p-3 sm:p-4">
       <div
         aria-hidden="true"
         className={cn(
@@ -185,13 +186,13 @@ function Macro({
         )}
       />
 
-      <div className="relative flex items-center justify-between">
+      <div className="relative flex items-center justify-between mb-2">
         <div className="text-xs font-medium text-muted-foreground">{label}</div>
-        <div className={cn("grid h-7 w-7 place-items-center", accentClass)}>
+        <div className={cn("grid h-6 w-6 sm:h-7 sm:w-7 place-items-center", accentClass)}>
           {icon}
         </div>
       </div>
-      <div className={cn("relative mt-2 text-2xl font-semibold", accentClass)}>
+      <div className={cn("relative text-xl sm:text-2xl font-semibold", accentClass)}>
         {value}
       </div>
     </div>
@@ -200,10 +201,10 @@ function Macro({
 
 export function Hero() {
   return (
-    <section className="relative mx-auto w-full max-w-6xl px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-      <div className="grid items-center gap-10 lg:grid-cols-2">
-        <div className="relative">
-          <Badge className="border-cyber-glass-border bg-black/30 text-neon-cyan">
+    <section className="relative mx-auto w-full max-w-6xl px-4 pb-12 sm:pb-16 pt-6 sm:pt-8 lg:pt-10 sm:px-6 lg:px-8">
+      <div className="grid items-start gap-6 sm:gap-8 lg:gap-10 lg:grid-cols-[1.2fr_1fr]">
+        <div className="relative order-2 lg:order-1">
+          <Badge className="border-cyber-glass-border bg-black/30 text-neon-cyan text-xs sm:text-sm px-2 sm:px-3 py-1">
             CYBER‑SPORT • HIGH PERFORMANCE
           </Badge>
 
@@ -211,7 +212,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-4 text-balance text-4xl font-semibold tracking-tight sm:text-6xl"
+            className="mt-3 sm:mt-4 text-balance text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-semibold tracking-tight leading-tight"
           >
             Saúde{" "}
             <span className="bg-gradient-to-r from-neon-cyan via-neon-violet to-neon-green bg-clip-text text-transparent">
@@ -225,7 +226,7 @@ export function Hero() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.08, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-5 max-w-xl text-pretty text-lg text-muted-foreground"
+            className="mt-4 sm:mt-5 max-w-xl text-pretty text-base sm:text-lg text-muted-foreground leading-relaxed"
           >
             NutriFit+ combina <span className="text-foreground">Vision AI</span>,{" "}
             gamificação e planos personalizados pra você comer, treinar e
@@ -237,17 +238,17 @@ export function Hero() {
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.16, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-            className="mt-7 flex flex-col gap-3 sm:flex-row"
+            className="mt-5 sm:mt-7 flex flex-col gap-3 sm:flex-row"
           >
             <Button
               asChild
               size="lg"
-              className="relative overflow-hidden bg-neon-cyan text-black hover:bg-neon-cyan/90"
+              className="relative overflow-hidden bg-neon-cyan text-black hover:bg-neon-cyan/90 text-sm sm:text-base"
             >
               <Link href="/onboarding">
                 <span className="relative z-10 flex items-center gap-2 font-semibold">
                   <Sparkles className="h-4 w-4" />
-                  Entrar no modo atleta
+                  <span className="whitespace-nowrap">Entrar no modo atleta</span>
                 </span>
                 <span
                   aria-hidden="true"
@@ -257,7 +258,7 @@ export function Hero() {
             </Button>
           </motion.div>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+          <div className="mt-6 sm:mt-8 grid gap-2.5 sm:gap-3 grid-cols-1 sm:grid-cols-3">
             <MiniStat
               icon={<Flame className="h-4 w-4 text-neon-green" />}
               title="Streaks"
@@ -280,9 +281,65 @@ export function Hero() {
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-          className="relative"
+          className="relative order-1 lg:order-2"
         >
-          <LiveScanCard />
+          <div className="grid gap-3 sm:gap-4">
+            {/* Vision AI Scan - SEMPRE NO TOPO */}
+            <LiveScanCard />
+            
+            {/* Grid com as duas imagens lado a lado embaixo - PERFEITAMENTE ALINHADAS */}
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+              {/* Imagem humanizada 1 */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2, duration: 0.6 }}
+                className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-cyber-glass-border bg-cyber-glass/20 backdrop-blur-xl group h-[280px] sm:h-[320px] lg:h-[380px]"
+              >
+                <Image
+                  src="/hero-image-1.png"
+                  alt="Atleta usando NutriFit+ - Experiência real e autêntica"
+                  width={736}
+                  height={1104}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  quality={95}
+                  priority
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
+                  <Badge className="border-cyber-glass-border bg-black/70 text-neon-cyan backdrop-blur-md shadow-lg text-xs px-2 py-1">
+                    ✨ Real • Autêntico • Humanizado
+                  </Badge>
+                </div>
+              </motion.div>
+              
+              {/* Imagem humanizada 2 */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3, duration: 0.6 }}
+                className="relative overflow-hidden rounded-2xl sm:rounded-3xl border border-cyber-glass-border bg-cyber-glass/20 backdrop-blur-xl group h-[280px] sm:h-[320px] lg:h-[380px]"
+              >
+                <Image
+                  src="/hero-image-2.png"
+                  alt="Resultados reais com NutriFit+ - Transformação e performance"
+                  width={1080}
+                  height={1920}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  quality={95}
+                  priority
+                  sizes="(max-width: 640px) 100vw, 50vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                <div className="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-4">
+                  <Badge className="border-cyber-glass-border bg-black/70 text-neon-green backdrop-blur-md shadow-lg text-xs px-2 py-1">
+                    🚀 Resultados Reais
+                  </Badge>
+                </div>
+              </motion.div>
+            </div>
+          </div>
         </motion.div>
       </div>
 

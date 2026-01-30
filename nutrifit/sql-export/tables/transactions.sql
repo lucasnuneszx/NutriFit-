@@ -1,0 +1,1 @@
+-- Tabela transactions: sem dados

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { getCurrentUser } from "@/lib/auth-server";
+import { query } from "@/lib/db";
 
 type Body = {
   draft?: {
@@ -17,95 +17,104 @@ type Body = {
   plan?: "free" | "plus";
 };
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Bootstrap do perfil (criar/atualizar perfil e biometria)
+ * POST /api/profile/bootstrap
+ */
 export async function POST(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json(
-      { ok: false, error: "missing_env" },
-      { status: 500 },
-    );
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
-  let body: Body = {};
   try {
-    body = (await request.json()) as Body;
-  } catch {
-    body = {};
-  }
+    const user = await getCurrentUser();
 
-  const draft = body.draft ?? {};
-  const plan = body.plan ?? "free";
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Não autenticado" },
+        { status: 401 }
+      );
+    }
 
-  // OBS: essas tabelas devem existir no Supabase (vamos criar o SQL no próximo passo).
-  const meta = user.user_metadata as Record<string, unknown>;
-  const metaNome = typeof meta?.nome === "string" ? meta.nome : null;
-  const metaAssistente =
-    typeof meta?.nome_assistente === "string" ? meta.nome_assistente : null;
+    let body: Body = {};
+    try {
+      body = (await request.json()) as Body;
+    } catch {
+      body = {};
+    }
 
-  const profilePayload = {
-    id: user.id,
-    nome: draft.nome ?? metaNome,
-    email: user.email ?? draft.email ?? null,
-    tipo_plano: plan,
-    nome_assistente: draft.nomeAssistente ?? metaAssistente,
-    contagem_streak: 0,
-  };
+    const draft = body.draft ?? {};
+    const plan = body.plan ?? "free";
 
-  const { error: profileError } = await supabase
-    .from("profiles")
-    .upsert(profilePayload, { onConflict: "id" });
+    // Criar/atualizar perfil
+    const profilePayload = {
+      id: user.id,
+      nome: draft.nome ?? user.nome,
+      email: draft.email ?? user.email,
+      tipo_plano: plan,
+      nome_assistente: draft.nomeAssistente ?? user.nome_assistente,
+      contagem_streak: 0,
+    };
 
-  const biometricsPayload = {
-    user_id: user.id,
-    peso: draft.pesoKg ?? null,
-    altura: draft.alturaCm ?? null,
-    idade: draft.idade ?? null,
-    genero: draft.genero ?? null,
-    nivel_atividade: draft.nivelAtividade ?? null,
-    condicoes_medicas: draft.condicoesMedicas ?? {},
-  };
+    await query(
+      `INSERT INTO profiles (id, nome, email, tipo_plano, nome_assistente, contagem_streak)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE
+       SET nome = EXCLUDED.nome,
+           email = EXCLUDED.email,
+           tipo_plano = EXCLUDED.tipo_plano,
+           nome_assistente = EXCLUDED.nome_assistente`,
+      [
+        profilePayload.id,
+        profilePayload.nome,
+        profilePayload.email,
+        profilePayload.tipo_plano,
+        profilePayload.nome_assistente,
+        profilePayload.contagem_streak,
+      ]
+    );
 
-  const { error: biometricsError } = await supabase
-    .from("biometrics")
-    .upsert(biometricsPayload, { onConflict: "user_id" });
+    // Criar/atualizar biometria
+    const biometricsPayload = {
+      user_id: user.id,
+      peso: draft.pesoKg ?? null,
+      altura: draft.alturaCm ?? null,
+      idade: draft.idade ?? null,
+      genero: draft.genero ?? null,
+      nivel_atividade: draft.nivelAtividade ?? null,
+      condicoes_medicas: draft.condicoesMedicas ?? {},
+    };
 
-  if (profileError || biometricsError) {
+    await query(
+      `INSERT INTO biometrics (user_id, peso, altura, idade, genero, nivel_atividade, condicoes_medicas)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (user_id) DO UPDATE
+       SET peso = EXCLUDED.peso,
+           altura = EXCLUDED.altura,
+           idade = EXCLUDED.idade,
+           genero = EXCLUDED.genero,
+           nivel_atividade = EXCLUDED.nivel_atividade,
+           condicoes_medicas = EXCLUDED.condicoes_medicas`,
+      [
+        biometricsPayload.user_id,
+        biometricsPayload.peso,
+        biometricsPayload.altura,
+        biometricsPayload.idade,
+        biometricsPayload.genero,
+        biometricsPayload.nivel_atividade,
+        JSON.stringify(biometricsPayload.condicoes_medicas),
+      ]
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[API /profile/bootstrap] Erro:", error);
     return NextResponse.json(
       {
         ok: false,
-        error: "db_error",
-        details: {
-          profile: profileError?.message ?? null,
-          biometrics: biometricsError?.message ?? null,
-        },
+        error: "Erro ao criar perfil",
+        details: error instanceof Error ? error.message : "Erro desconhecido",
       },
-      { status: 200 },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({ ok: true });
 }
-

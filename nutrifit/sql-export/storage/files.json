@@ -1,0 +1,34 @@
+[
+  {
+    "bucket": "food",
+    "name": "13ab0883-2dd0-45e0-8c1a-89b71a44a0c3",
+    "size": 0,
+    "mimetype": "unknown",
+    "public_url": "https://icrqzxuaajuxseszdinz.supabase.co/storage/v1/object/public/food/13ab0883-2dd0-45e0-8c1a-89b71a44a0c3",
+    "created_at": "2026-01-30T15:36:04.276Z"
+  },
+  {
+    "bucket": "food",
+    "name": "d2e0f772-b9b6-4057-b6b9-007c838e267c",
+    "size": 0,
+    "mimetype": "unknown",
+    "public_url": "https://icrqzxuaajuxseszdinz.supabase.co/storage/v1/object/public/food/d2e0f772-b9b6-4057-b6b9-007c838e267c",
+    "created_at": "2026-01-30T15:36:04.277Z"
+  },
+  {
+    "bucket": "logos",
+    "name": ".emptyFolderPlaceholder",
+    "size": 0,
+    "mimetype": "application/octet-stream",
+    "public_url": "https://icrqzxuaajuxseszdinz.supabase.co/storage/v1/object/public/logos/.emptyFolderPlaceholder",
+    "created_at": "2026-01-15T21:14:11.185Z"
+  },
+  {
+    "bucket": "logos",
+    "name": "ss.png",
+    "size": 9725326,
+    "mimetype": "image/png",
+    "public_url": "https://icrqzxuaajuxseszdinz.supabase.co/storage/v1/object/public/logos/ss.png",
+    "created_at": "2026-01-15T21:14:19.053Z"
+  }
+]

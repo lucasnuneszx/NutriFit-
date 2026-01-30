@@ -78,13 +78,13 @@ export function VerifyGate() {
   };
 
   const accept = async () => {
-    setPlan("plus");
-    await bootstrap("plus");
+    // Redirecionar para checkout ao invés de setar plano direto
     setShowOffer(false);
-    router.push("/dashboard");
+    router.push("/checkout");
   };
 
   const decline = async () => {
+    // Se recusar, vai direto pro dashboard com plano free
     setPlan("free");
     await bootstrap("free");
     setShowOffer(false);
@@ -158,22 +158,13 @@ export function VerifyGate() {
               </div>
             ) : null}
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6">
               <Button
                 variant="secondary"
-                className="border border-cyber-glass-border bg-black/20 text-foreground hover:bg-cyber-glass/40"
+                className="w-full border border-cyber-glass-border bg-black/20 text-foreground hover:bg-cyber-glass/40"
                 onClick={() => router.push("/auth")}
               >
                 Voltar pro login
-              </Button>
-
-              <Button
-                className="bg-neon-green text-black hover:bg-neon-green/90"
-                onClick={() => setShowOffer(true)}
-                disabled={saving}
-              >
-                {saving ? "Salvando..." : "Abrir oferta (debug)"}
-                <Sparkles className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>

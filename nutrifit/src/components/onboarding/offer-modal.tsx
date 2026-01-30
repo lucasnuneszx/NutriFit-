@@ -7,6 +7,7 @@ import { Sparkles, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { PixPayment } from "@/components/payment/pix-payment";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -31,6 +32,7 @@ export function OfferModal({
   onDecline: () => void;
 }) {
   const [secondsLeft, setSecondsLeft] = React.useState(10 * 60);
+  const [showPayment, setShowPayment] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -140,7 +142,10 @@ export function OfferModal({
                       className="rounded-3xl"
                     >
                       <Button
-                        onClick={onAccept}
+                        onClick={() => {
+                          // Redirecionar para checkout ao invés de mostrar pagamento no modal
+                          window.location.href = "/checkout";
+                        }}
                         size="lg"
                         className="h-12 w-full bg-neon-green text-black hover:bg-neon-green/90"
                       >

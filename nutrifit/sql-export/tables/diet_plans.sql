@@ -1,0 +1,13 @@
+-- ============================================
+-- Tabela: diet_plans
+-- Registros: 1
+-- ============================================
+
+-- Desabilitar triggers temporariamente
+ALTER TABLE diet_plans DISABLE TRIGGER ALL;
+
+INSERT INTO diet_plans (id, user_id, goal, calories_target, protein_g, carbs_g, fats_g, plan, groceries, created_at) VALUES (1, '13ab0883-2dd0-45e0-8c1a-89b71a44a0c3', 'bulking', 3000, 180, 420, 66, '{"meals":[{"items":["4 ovos inteiros mexidos","100g de aveia em flocos","1 banana grande picada","1 colher de sopa de mel"],"notes":"Foco em carboidratos complexos e proteínas de alto valor biológico para iniciar o dia.","title":"Café da Manhã - Despertar Anabólico"},{"items":["200g de peito de frango grelhado","250g de arroz branco ou integral","100g de feijão preto ou carioca","Brócolis e cenoura no vapor à vontade","1 colher de chá de azeite de oliva extra virgem"],"notes":"Refeição densa em nutrientes para sustentar o treino e a recuperação.","title":"Almoço - Combustível de Performance"},{"items":["150g de batata doce cozida","1 lata de atum em conserva (em água)","Café preto sem açúcar (opcional para foco)"],"notes":"Carboidratos de baixo índice glicêmico para energia sustentada durante a sessão de força.","title":"Pré-Treino - Energia Máxima"},{"items":["180g de patinho moído ou carne magra","300g de batata inglesa assada ou purê","Salada verde (alface, rúcula, espinafre) à vontade","1 fatia de abacaxi"],"notes":"O abacaxi contém bromelina, que auxilia na digestão das proteínas e recuperação muscular.","title":"Pós-Treino/Jantar - Recuperação de Elite"},{"items":["200g de iogurte grego natural","30g de pasta de amendoim integral","1 scoop de Whey Protein (opcional) ou 3 claras de ovos"],"notes":"Gorduras boas e proteínas de absorção lenta para evitar o catabolismo durante o sono.","title":"Ceia - Proteção Noturna"}],"notes":"Como os dados biométricos não foram informados, assumimos um perfil padrão de 75kg com nível de atividade moderada para calcular um superávit calórico seguro. Esta dieta foca em 2.4g/kg de proteína para maximizar a síntese proteica. Ajuste as porções se sentir fome excessiva ou ganho de gordura acelerado. Mantenha a hidratação em no mínimo 3.5 litros de água por dia. Sem desculpas, Lucas. Treine pesado ou continue o mesmo."}'::jsonb, '["Ovos (pelo menos 3 dúzias)","Peito de frango","Carne moída magra (Patinho)","Atum em lata (em água)","Aveia em flocos","Arroz (branco ou integral)","Feijão","Batata doce","Batata inglesa","Bananas","Abacaxi","Brócolis e Cenoura","Folhas verdes","Iogurte grego natural","Pasta de amendoim","Azeite de oliva extra virgem","Mel"]'::jsonb, '2026-01-30T15:10:17.6759+00:00');
+
+-- Reabilitar triggers
+ALTER TABLE diet_plans ENABLE TRIGGER ALL;
+

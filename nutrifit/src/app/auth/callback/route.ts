@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
 
-  const response = NextResponse.redirect(new URL("/verify", request.url));
+  const response = NextResponse.redirect(new URL("/dashboard", request.url));
 
   if (code) {
     const cookieStore = await cookies();

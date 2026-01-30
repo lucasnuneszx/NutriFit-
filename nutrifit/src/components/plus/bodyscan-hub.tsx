@@ -11,7 +11,11 @@ import { useState, useRef } from "react";
 type ScanResult = {
   biotipo: string;
   percentualGordura: string;
+  imcEstimado?: number | null;
   pontosFortes: string[];
+  areasMelhoria?: string[];
+  recomendacoesTreino?: string[];
+  recomendacoesNutricao?: string[];
   macros: {
     proteina: number;
     carboidratos: number;
@@ -66,34 +70,11 @@ export function BodyScanHub() {
     setErro(null);
 
     try {
-      const systemPrompt = `Você é um Nutricionista Esportivo Elite com 15+ anos de experiência em análise de composição corporal.
-
-ANÁLISE OBRIGATÓRIA:
-1. BIOTIPO: Classifique como Ectomorfo, Mesomorfo, Endomorfo ou Combinado
-2. ESTIMATIVA DE GORDURA CORPORAL: Forneça um percentual visual estimado
-3. PONTOS FORTES MUSCULARES: Liste 3-4 grupos musculares mais desenvolvidos
-4. SUGESTÃO DE MACRONUTRIENTES: Recomende proporção adequada
-
-Responda em JSON válido com esta estrutura:
-{
-  "biotipo": "string",
-  "percentualGordura": "string",
-  "pontosFortes": ["string", "string", "string"],
-  "macros": {"proteina": number, "carboidratos": number, "gorduras": number},
-  "observacoes": "string"
-}`;
-
       const payload = {
         imagem_base64: imagemBase64,
-        model: "gpt-4-vision",
-        system_prompt: systemPrompt,
-        max_tokens: 500,
       };
 
-      // TODO: Substitua com seu endpoint real
-      const API_ENDPOINT = "/api/bodyscan/analise";
-
-      const response = await fetch(API_ENDPOINT, {
+      const response = await fetch("/api/bodyscan/analise", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -102,29 +83,16 @@ Responda em JSON válido com esta estrutura:
       });
 
       if (!response.ok) {
-        // Simular resposta para teste
-        const mockResponse: ScanResult = {
-          biotipo: "Mesomorfo",
-          percentualGordura: "15-18%",
-          pontosFortes: [
-            "Ombros e costas desenvolvidos",
-            "Peitoral bem definido",
-            "Core marcado",
-          ],
-          macros: {
-            proteina: 35,
-            carboidratos: 45,
-            gorduras: 20,
-          },
-          observacoes:
-            "Físico atlético bem estruturado. Continuar com treino de força.",
-        };
-        setResultado(mockResponse);
-        return;
+        const errorData = await response.json();
+        throw new Error(errorData.erro || errorData.message || "Erro ao analisar imagem");
       }
 
       const data = await response.json();
-      setResultado(data.resultado || data);
+      if (data.ok && data.resultado) {
+        setResultado(data.resultado);
+      } else {
+        throw new Error("Resposta inválida da API");
+      }
     } catch (erro) {
       console.error("Erro ao analisar:", erro);
       setErro("Erro ao analisar a imagem. Tente novamente.");
@@ -368,13 +336,25 @@ Responda em JSON válido com esta estrutura:
                     </p>
                   </div>
 
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <p className="text-sm text-gray-400 uppercase tracking-wider">
-                      Estimativa de Gordura
-                    </p>
-                    <p className="text-2xl font-bold text-green-400">
-                      {resultado.percentualGordura}
-                    </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="border-l-4 border-green-500 pl-4">
+                      <p className="text-sm text-gray-400 uppercase tracking-wider">
+                        Estimativa de Gordura
+                      </p>
+                      <p className="text-2xl font-bold text-green-400">
+                        {resultado.percentualGordura}
+                      </p>
+                    </div>
+                    {resultado.imcEstimado && (
+                      <div className="border-l-4 border-blue-500 pl-4">
+                        <p className="text-sm text-gray-400 uppercase tracking-wider">
+                          IMC Estimado
+                        </p>
+                        <p className="text-2xl font-bold text-blue-400">
+                          {resultado.imcEstimado.toFixed(1)}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-l-4 border-green-500 pl-4">
@@ -387,6 +367,45 @@ Responda em JSON válido com esta estrutura:
                       ))}
                     </ul>
                   </div>
+
+                  {resultado.areasMelhoria && resultado.areasMelhoria.length > 0 && (
+                    <div className="border-l-4 border-yellow-500 pl-4">
+                      <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">
+                        Áreas de Melhoria
+                      </p>
+                      <ul className="space-y-1 text-sm text-yellow-300">
+                        {resultado.areasMelhoria.map((area, i) => (
+                          <li key={i}>• {area}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {resultado.recomendacoesTreino && resultado.recomendacoesTreino.length > 0 && (
+                    <div className="border-l-4 border-cyan-500 pl-4">
+                      <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">
+                        Recomendações de Treino
+                      </p>
+                      <ul className="space-y-1 text-sm text-cyan-300">
+                        {resultado.recomendacoesTreino.map((rec, i) => (
+                          <li key={i}>• {rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {resultado.recomendacoesNutricao && resultado.recomendacoesNutricao.length > 0 && (
+                    <div className="border-l-4 border-purple-500 pl-4">
+                      <p className="text-sm text-gray-400 uppercase tracking-wider mb-2">
+                        Recomendações Nutricionais
+                      </p>
+                      <ul className="space-y-1 text-sm text-purple-300">
+                        {resultado.recomendacoesNutricao.map((rec, i) => (
+                          <li key={i}>• {rec}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   <div className="border-l-4 border-green-500 pl-4">
                     <p className="text-sm text-gray-400 uppercase tracking-wider mb-3">

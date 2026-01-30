@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Activity,
   BadgeCheck,
@@ -11,10 +11,12 @@ import {
   Flame,
   Dumbbell,
   LogOut,
+  MessageCircle,
   ScanLine,
   Shield,
   Sparkles,
   Upload,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -127,6 +129,9 @@ export function DashboardShell() {
   ]);
   const [composer, setComposer] = React.useState("");
   const [sendingMessage, setSendingMessage] = React.useState(false);
+  const [chatMinimized, setChatMinimized] = React.useState(false);
+  const [isTyping, setIsTyping] = React.useState(false);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
   const [scanHistory, setScanHistory] = React.useState<Array<{
     id: number;
     imagem_url: string | null;
@@ -425,6 +430,28 @@ export function DashboardShell() {
     cameraInputRef.current?.click();
   };
 
+  // Scroll automático apenas dentro do ScrollArea do chat (sem afetar a página)
+  React.useEffect(() => {
+    // Usa setTimeout para garantir que o DOM foi atualizado
+    const timer = setTimeout(() => {
+      // Encontra o viewport do ScrollArea do chat usando o chatEndRef
+      if (chatEndRef.current) {
+        const scrollArea = chatEndRef.current.closest('[data-slot="scroll-area"]');
+        const viewport = scrollArea?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+        
+        if (viewport) {
+          // Scroll apenas dentro do viewport, não na página
+          viewport.scrollTo({
+            top: viewport.scrollHeight,
+            behavior: "smooth"
+          });
+        }
+      }
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, [chat, isTyping]);
+
   const sendMessage = async () => {
     const text = composer.trim();
     if (!text || sendingMessage) return;
@@ -432,6 +459,7 @@ export function DashboardShell() {
     setChat((c) => [...c, userMsg]);
     setComposer("");
     setSendingMessage(true);
+    setIsTyping(true);
 
     try {
       const res = await fetch("/api/assistant/chat", {
@@ -444,17 +472,48 @@ export function DashboardShell() {
         return;
       }
       const json = (await res.json()) as unknown;
-      const data = json as Partial<{ ok: boolean; reply: string }>;
-      if (!data.ok || !data.reply) {
+      const data = json as Partial<{ ok: boolean; reply: string; error: string; message: string }>;
+      
+      // Simular delay de "pensando" para melhor UX
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (!data.ok) {
+        let errorMessage = "Desculpe, não consegui processar sua mensagem agora.";
+        
+        if (data.error === "gemini_quota_error" || res.status === 429) {
+          errorMessage = "⏱️ Limite de requisições atingido. Aguarde alguns segundos e tente novamente. A API do Gemini tem limites de uso por minuto.";
+        } else if (data.error === "gemini_auth_error") {
+          errorMessage = "🔑 Erro de autenticação: Verifique se GEMINI_API_KEY está configurada corretamente no .env.local";
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (data.error) {
+          errorMessage = `Erro: ${data.error}`;
+        }
+        
+        setIsTyping(false);
         setChat((c) => [
           ...c,
           {
             role: "assistant",
-            text: `${profile.nomeAssistente}: Desculpe, não consegui processar sua mensagem agora.`,
+            text: `${profile.nomeAssistente}: ${errorMessage}`,
           },
         ]);
         return;
       }
+      
+      if (!data.reply) {
+        setIsTyping(false);
+        setChat((c) => [
+          ...c,
+          {
+            role: "assistant",
+            text: `${profile.nomeAssistente}: Desculpe, não recebi uma resposta válida.`,
+          },
+        ]);
+        return;
+      }
+      
+      setIsTyping(false);
       setChat((c) => [
         ...c,
         {
@@ -463,14 +522,27 @@ export function DashboardShell() {
         },
       ]);
     } catch (error) {
+      setIsTyping(false);
       const errorMsg = error instanceof Error ? error.message : "Erro desconhecido";
-      setChat((c) => [
-        ...c,
-        {
-          role: "assistant",
-          text: `${profile.nomeAssistente}: Erro: ${errorMsg}. Verifique a chave da OpenAI no .env.local`,
-        },
-      ]);
+      
+      // Verificar se é erro de JSON
+      if (errorMsg.includes("JSON") || errorMsg.includes("Unexpected")) {
+        setChat((c) => [
+          ...c,
+          {
+            role: "assistant",
+            text: `${profile.nomeAssistente}: Erro ao processar resposta. Verifique se a chave GEMINI_API_KEY está configurada no .env.local e reinicie o servidor.`,
+          },
+        ]);
+      } else {
+        setChat((c) => [
+          ...c,
+          {
+            role: "assistant",
+            text: `${profile.nomeAssistente}: Erro: ${errorMsg}. Verifique a configuração do Gemini.`,
+          },
+        ]);
+      }
     } finally {
       setSendingMessage(false);
     }
@@ -502,12 +574,30 @@ export function DashboardShell() {
   }, [loadScanHistory]);
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative min-h-screen bg-black">
       <CyberBackground />
 
-      <main className="mx-auto w-full max-w-7xl px-3 pb-8 pt-4 sm:px-4 sm:pb-12 sm:pt-6 lg:px-6 lg:pt-8">
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 lg:grid-cols-12">
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-4">
+      {/* Botão flutuante do chat quando minimizado */}
+      {chatMinimized && (
+        <motion.button
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          onClick={() => setChatMinimized(false)}
+          className="fixed bottom-6 right-6 z-50 grid h-14 w-14 place-items-center rounded-full border border-neon-violet/50 bg-neon-violet/20 backdrop-blur-xl shadow-lg transition-all hover:bg-neon-violet/30 hover:scale-110 active:scale-95"
+          aria-label="Abrir assistente IA"
+        >
+          <MessageCircle className="h-6 w-6 text-neon-violet" />
+          {chat.length > 1 && (
+            <span className="absolute -top-1 -right-1 grid h-5 w-5 place-items-center rounded-full bg-neon-cyan text-xs font-semibold text-black">
+              {chat.length - 1}
+            </span>
+          )}
+        </motion.button>
+      )}
+
+      <main className="mx-auto w-full max-w-7xl px-4 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-5 lg:px-6 lg:pb-12 lg:pt-8">
+        <div className="grid gap-4 grid-cols-1 lg:grid-cols-12">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-4">
             <Glow accent="green" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -568,7 +658,7 @@ export function DashboardShell() {
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-8">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-8">
             <Glow accent="cyan" />
 
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -648,7 +738,7 @@ export function DashboardShell() {
               </div>
             </div>
 
-            <div className="relative mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+            <div className="relative mt-5 grid gap-4 grid-cols-1 lg:grid-cols-[1fr_1fr]">
               <div
                 className="relative overflow-hidden rounded-3xl border border-cyber-glass-border bg-black/25 cursor-pointer transition-all hover:border-neon-cyan/50 active:scale-[0.98]"
                 onClick={handleSelectImage}
@@ -768,60 +858,320 @@ export function DashboardShell() {
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-7">
-            <Glow accent="violet" />
-            <div className="relative flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-medium tracking-wide text-muted-foreground">
-                  ASSISTENTE IA
+          {!chatMinimized && (
+            <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-8 lg:col-start-3">
+              <Glow accent="violet" />
+              <div className="relative flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-medium tracking-wide text-muted-foreground">
+                    ASSISTENTE IA
+                  </div>
+                  <div className="mt-1 text-sm font-semibold tracking-tight">
+                    {profile.nomeAssistente} • Coach Mode
+                  </div>
                 </div>
-                <div className="mt-1 text-sm font-semibold tracking-tight">
-                  {profile.nomeAssistente} • Coach Mode
+                <div className="flex items-center gap-2">
+                  <Badge className="border-cyber-glass-border bg-black/30 text-neon-violet">
+                    personalidade
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setChatMinimized(true)}
+                    className="h-8 w-8 p-0 border border-cyber-glass-border hover:bg-black/30"
+                    aria-label="Minimizar chat"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <Badge className="border-cyber-glass-border bg-black/30 text-neon-violet">
-                personalidade
-              </Badge>
-            </div>
 
             <Separator className="my-4 bg-white/10" />
 
             <ScrollArea className="h-[260px] pr-2">
-              <div className="grid gap-3">
+              <div className="grid gap-3 pb-2">
                 {chat.map((m, idx) => (
-                  <div
+                  <motion.div
                     key={idx}
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ 
+                      duration: 0.3,
+                      delay: idx * 0.05,
+                      ease: [0.16, 1, 0.3, 1]
+                    }}
                     className={cn(
-                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed",
+                      "rounded-2xl border px-4 py-3 text-sm leading-relaxed relative overflow-hidden",
                       m.role === "assistant"
-                        ? "border-cyber-glass-border bg-black/25 text-muted-foreground"
-                        : "border-neon-cyan/25 bg-black/30 text-foreground",
+                        ? "border-cyber-glass-border bg-gradient-to-br from-black/40 to-black/20 text-muted-foreground"
+                        : "border-neon-cyan/30 bg-gradient-to-br from-neon-cyan/10 to-black/30 text-foreground shadow-lg shadow-neon-cyan/10",
                     )}
                   >
-                    {m.text}
-                  </div>
+                    {/* Efeito de brilho sutil */}
+                    <div className={cn(
+                      "absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300",
+                      m.role === "assistant"
+                        ? "bg-gradient-to-r from-transparent via-white/5 to-transparent"
+                        : "bg-gradient-to-r from-transparent via-neon-cyan/10 to-transparent"
+                    )} />
+                    
+                    {/* Conteúdo da mensagem */}
+                    <div className="relative z-10">
+                      {m.role === "assistant" && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <div className="h-6 w-6 rounded-full bg-gradient-to-br from-neon-cyan to-neon-violet flex items-center justify-center">
+                            <BrainCircuit className="h-3.5 w-3.5 text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-neon-cyan">
+                            {profile.nomeAssistente}
+                          </span>
+                        </div>
+                      )}
+                      <div className={cn(
+                        m.role === "user" && "font-medium"
+                      )}>
+                        {m.text}
+                      </div>
+                    </div>
+                  </motion.div>
                 ))}
+                
+                {/* Indicador de "digitando/pensando" */}
+                <AnimatePresence>
+                  {isTyping && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.2 }}
+                      className="rounded-2xl border border-cyber-glass-border bg-gradient-to-br from-black/40 to-black/20 px-4 py-3"
+                    >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-6 w-6 rounded-full bg-gradient-to-br from-neon-cyan to-neon-violet flex items-center justify-center">
+                        <BrainCircuit className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <span className="text-xs font-semibold text-neon-cyan">
+                        {profile.nomeAssistente}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        pensando...
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: 0 }}
+                        className="h-2 w-2 rounded-full bg-neon-cyan"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
+                        className="h-2 w-2 rounded-full bg-neon-cyan"
+                      />
+                      <motion.div
+                        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                        transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
+                        className="h-2 w-2 rounded-full bg-neon-cyan"
+                      />
+                    </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <div ref={chatEndRef} />
               </div>
             </ScrollArea>
 
-            <div className="mt-4 flex gap-2">
+            <motion.div 
+              className="mt-4 flex gap-2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <Textarea
                 value={composer}
                 onChange={(e) => setComposer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
                 placeholder="Ex: Hoje quero cutting, 2.000 kcal..."
-                className="min-h-[44px] resize-none border-cyber-glass-border bg-black/25"
+                className="min-h-[44px] resize-none border-cyber-glass-border bg-black/25 focus:border-neon-cyan/50 focus:ring-1 focus:ring-neon-cyan/30 transition-all"
+                disabled={sendingMessage}
               />
               <Button
                 onClick={sendMessage}
                 disabled={sendingMessage || !composer.trim()}
-                className="h-[44px] bg-neon-violet text-black hover:bg-neon-violet/90 disabled:opacity-50"
+                className="h-[44px] bg-neon-violet text-black hover:bg-neon-violet/90 disabled:opacity-50 relative overflow-hidden group"
               >
-                {sendingMessage ? "Enviando..." : "Enviar"}
+                {sendingMessage ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    className="flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Enviando...</span>
+                  </motion.div>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Enviar
+                  </span>
+                )}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
               </Button>
-            </div>
+            </motion.div>
           </Card>
+          )}
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-7">
+          {/* Separador Visual com Imagem Humanizada - Mobile First */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="relative lg:col-span-12 my-4"
+          >
+            <div className="relative overflow-hidden rounded-3xl border border-cyber-glass-border bg-cyber-glass/15 backdrop-blur-xl group">
+              {/* Mobile: Layout Vertical - Imagem Preenche Tudo */}
+              <div className="flex flex-col lg:hidden">
+                {/* Header Mobile - Overlay na Imagem */}
+                <div className="relative min-h-[500px] flex flex-col">
+                  {/* Imagem Mobile - Preenche Todo o Espaço */}
+                  <div className="absolute inset-0">
+                    <Image
+                      src="/dashboard-hero.png"
+                      alt="Atleta de alta performance - Resultados reais com NutriFit+"
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      quality={95}
+                      priority
+                      sizes="100vw"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/30" />
+                  </div>
+
+                  {/* Conteúdo sobreposto */}
+                  <div className="relative z-10 flex flex-col justify-between h-full min-h-[500px] p-6">
+                    {/* Topo - Badge e Título */}
+                    <div className="space-y-3">
+                      <Badge className="border-cyber-glass-border bg-black/60 text-neon-cyan backdrop-blur-md">
+                        ✨ Inspiração Real
+                      </Badge>
+                      <h3 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-neon-cyan to-neon-violet bg-clip-text text-transparent">
+                        Transformação Autêntica
+                      </h3>
+                      <p className="text-sm text-white/90 leading-relaxed">
+                        Resultados reais de atletas que usam NutriFit+ para alcançar alta performance.
+                      </p>
+                    </div>
+
+                    {/* Rodapé - Métricas e Botão */}
+                    <div className="space-y-4 mt-auto">
+                      {/* Métricas Mobile - Grid 2x2 */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1 text-center p-3 rounded-2xl border border-white/20 bg-black/60 backdrop-blur-md">
+                          <div className="text-2xl font-bold text-neon-green">
+                            +150%
+                          </div>
+                          <div className="text-xs text-white/80">
+                            Melhoria em consistência
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-center p-3 rounded-2xl border border-white/20 bg-black/60 backdrop-blur-md">
+                          <div className="text-2xl font-bold text-neon-cyan">
+                            24/7
+                          </div>
+                          <div className="text-xs text-white/80">
+                            Suporte IA Athena
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão Mobile - Full Width */}
+                      <Button
+                        asChild
+                        className="bg-neon-violet text-black hover:bg-neon-violet/90 w-full"
+                      >
+                        <Link href="/perfil">Ver meu progresso</Link>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop: Layout Horizontal - Imagem Preenche */}
+              <div className="hidden lg:block relative min-h-[600px]">
+                {/* Imagem de Fundo - Preenche Tudo */}
+                <div className="absolute inset-0">
+                  <Image
+                    src="/dashboard-hero.png"
+                    alt="Atleta de alta performance - Resultados reais com NutriFit+"
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    quality={95}
+                    priority
+                    sizes="100vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/60 to-black/40" />
+                </div>
+
+                {/* Conteúdo sobreposto */}
+                <div className="relative z-10 grid grid-cols-[1fr_1.5fr_1fr] gap-8 items-center min-h-[600px] p-8">
+                  {/* Seção Esquerda - Contexto */}
+                  <div className="space-y-4">
+                    <Badge className="border-white/20 bg-black/60 text-neon-cyan backdrop-blur-md">
+                      ✨ Inspiração Real
+                    </Badge>
+                    <h3 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-neon-cyan to-neon-violet bg-clip-text text-transparent">
+                      Transformação Autêntica
+                    </h3>
+                    <p className="text-sm text-white/90 leading-relaxed">
+                      Resultados reais de atletas que usam NutriFit+ para alcançar alta performance.
+                    </p>
+                  </div>
+
+                  {/* Seção Central - Espaço para Imagem (já está no fundo) */}
+                  <div className="relative h-full flex items-center justify-center">
+                    {/* Imagem já está no background */}
+                  </div>
+
+                  {/* Seção Direita - Call to Action */}
+                  <div className="space-y-4">
+                    <div className="space-y-2 p-4 rounded-2xl border border-white/20 bg-black/60 backdrop-blur-md">
+                      <div className="text-3xl font-bold text-neon-green">
+                        +150%
+                      </div>
+                      <div className="text-xs text-white/80">
+                        Melhoria média em consistência
+                      </div>
+                    </div>
+                    <div className="space-y-2 p-4 rounded-2xl border border-white/20 bg-black/60 backdrop-blur-md">
+                      <div className="text-3xl font-bold text-neon-cyan">
+                        24/7
+                      </div>
+                      <div className="text-xs text-white/80">
+                        Suporte da IA Athena
+                      </div>
+                    </div>
+                    <Button
+                      asChild
+                      className="mt-4 bg-neon-violet text-black hover:bg-neon-violet/90 w-full"
+                    >
+                      <Link href="/perfil">Ver meu progresso</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-7">
             <Glow accent="cyan" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -869,7 +1219,7 @@ export function DashboardShell() {
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-5">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-5">
             <Glow accent="violet" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -919,7 +1269,7 @@ export function DashboardShell() {
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-7">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-7">
             <Glow accent="violet" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -947,7 +1297,7 @@ export function DashboardShell() {
             <MonthHeatmap days={month.days} />
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-5">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-5">
             <Glow accent="cyan" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -1007,7 +1357,7 @@ export function DashboardShell() {
             </div>
           </Card>
 
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-7">
+          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-5 sm:p-6 backdrop-blur-xl lg:col-span-7">
             <Glow accent="green" />
             <div className="relative flex items-start justify-between gap-3">
               <div>
@@ -1068,52 +1418,6 @@ export function DashboardShell() {
                 )}
               </div>
             </ScrollArea>
-          </Card>
-
-          <Card className="relative overflow-hidden border-cyber-glass-border bg-cyber-glass/25 p-4 sm:p-6 backdrop-blur-xl lg:col-span-5">
-            <Glow accent="red" />
-            <div className="relative">
-              <div className="text-xs font-medium tracking-wide text-muted-foreground">
-                BLOQUEIOS (Free)
-              </div>
-              <div className="mt-1 text-sm font-semibold tracking-tight">
-                Simulação de limite semanal
-              </div>
-              <div className="mt-2 text-sm text-muted-foreground">
-                Quando o Free passa de <span className="text-foreground">3 scans</span>{" "}
-                na semana, acionamos o modal de upgrade automaticamente.
-              </div>
-            </div>
-
-            <Separator className="my-4 bg-white/10" />
-
-            <div className="relative grid gap-3">
-              <div className="rounded-2xl border border-cyber-glass-border bg-black/20 p-4 text-sm text-muted-foreground">
-                Status atual:{" "}
-                <span className="text-foreground">{usage.used}</span>{" "}
-                scans • Semana{" "}
-                <span className="text-foreground">{usage.weekId}</span>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  variant="secondary"
-                  className="border border-cyber-glass-border bg-black/20 text-foreground hover:bg-cyber-glass/40"
-                  onClick={() => {
-                    setPlan("free");
-                    setPlanState("free");
-                  }}
-                >
-                  Modo Free
-                </Button>
-                <Button
-                  className="bg-neon-green text-black hover:bg-neon-green/90"
-                  onClick={() => onChoosePlan("plus")}
-                >
-                  Ativar NutriPlus (mock)
-                </Button>
-              </div>
-            </div>
           </Card>
         </div>
       </main>

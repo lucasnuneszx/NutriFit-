@@ -1,179 +1,155 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
+import { getCurrentUser } from "@/lib/auth-server";
+import { query } from "@/lib/db";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * Obter perfil do usuário atual
+ * GET /api/profile/me
+ */
 export async function GET() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    console.error("[API /profile/me] Erro ao obter usuário:", userError);
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
-  console.log("[API /profile/me] Usuário autenticado:", {
-    id: user.id,
-    email: user.email,
-  });
-
-  // Busca o perfil
-  // Nota: Se foto_url não existir no banco, remova do select abaixo
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,nome,email,tipo_plano,contagem_streak,foto_url,bio,peso,altura,objetivo")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("[API /profile/me] Erro ao buscar perfil:", profileError);
-    return NextResponse.json(
-      { ok: false, error: "database_error", details: profileError.message },
-      { status: 500 },
-    );
-  }
-
-  // Debug detalhado
-  console.log("[API /profile/me] Resultado da query:", {
-    userId: user.id,
-    profileExists: !!profile,
-    profile: profile,
-    nome: profile?.nome,
-    tipo_plano: profile?.tipo_plano,
-    email: profile?.email,
-  });
-
-  // Se não tem perfil, tenta criar um básico
-  if (!profile) {
-    console.log("[API /profile/me] Perfil não encontrado, tentando criar perfil básico...");
-    
-    // Tenta obter nome do user_metadata
-    const meta = user.user_metadata as Record<string, unknown>;
-    const metaNome = typeof meta?.nome === "string" ? meta.nome : null;
-    
-    const newProfile = {
-      id: user.id,
-      nome: metaNome || null,
-      email: user.email || null,
-      tipo_plano: "free" as const,
-      nome_assistente: null,
-      contagem_streak: 0,
-    };
-
-    const { data: createdProfile, error: createError } = await supabase
-      .from("profiles")
-      .insert(newProfile)
-      .select()
-      .single();
-
-    if (createError) {
-      console.error("[API /profile/me] Erro ao criar perfil:", createError);
-      // Mesmo com erro, retorna null para o frontend tratar
-      return NextResponse.json({
-        ok: true,
-        user: { id: user.id, email: user.email },
-        profile: null,
-      });
-    }
-
-    console.log("[API /profile/me] Perfil criado:", createdProfile);
-    return NextResponse.json({
-      ok: true,
-      user: { id: user.id, email: user.email },
-      profile: createdProfile,
-    });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    user: { id: user.id, email: user.email },
-    profile: profile,
-  });
-}
-
-export async function PUT(request: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !anonKey) {
-    return NextResponse.json({ ok: false, error: "missing_env" }, { status: 500 });
-  }
-
-  const cookieStore = await cookies();
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => cookieStore.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          cookieStore.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  }
-
   try {
-    const body = await request.json() as Record<string, unknown>;
+    const user = await getCurrentUser();
 
-    // Atualizar perfil com os dados enviados
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update(body)
-      .eq("id", user.id);
-
-    if (updateError) {
-      console.error("[API /profile/me] Erro ao atualizar perfil:", updateError);
+    if (!user) {
       return NextResponse.json(
-        { ok: false, error: "update_failed", details: updateError.message },
-        { status: 500 },
+        { ok: false, error: "Não autenticado" },
+        { status: 401 }
       );
     }
 
-    // Buscar o perfil atualizado
-    const { data: updatedProfile } = await supabase
-      .from("profiles")
-      .select()
-      .eq("id", user.id)
-      .maybeSingle();
+    // Buscar perfil completo
+    const profileResult = await query(
+      `SELECT id, nome, email, tipo_plano, contagem_streak, foto_url, bio, peso, altura, objetivo, nome_assistente
+       FROM profiles
+       WHERE id = $1`,
+      [user.id]
+    );
+
+    const profile = profileResult.rows[0] || null;
+
+    // Se não tem perfil, criar um básico
+    if (!profile) {
+      const newProfile = {
+        id: user.id,
+        nome: user.nome,
+        email: user.email,
+        tipo_plano: user.tipo_plano,
+        nome_assistente: user.nome_assistente,
+        contagem_streak: 0,
+      };
+
+      await query(
+        `INSERT INTO profiles (id, nome, email, tipo_plano, nome_assistente, contagem_streak)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          newProfile.id,
+          newProfile.nome,
+          newProfile.email,
+          newProfile.tipo_plano,
+          newProfile.nome_assistente,
+          newProfile.contagem_streak,
+        ]
+      );
+
+      return NextResponse.json({
+        ok: true,
+        user: { id: user.id, email: user.email },
+        profile: newProfile,
+      });
+    }
 
     return NextResponse.json({
       ok: true,
-      profile: updatedProfile,
+      user: { id: user.id, email: user.email },
+      profile: profile,
     });
   } catch (error) {
-    console.error("[API /profile/me] Erro ao processar request:", error);
+    console.error("[API /profile/me] Erro:", error);
     return NextResponse.json(
-      { ok: false, error: "invalid_request" },
-      { status: 400 },
+      { ok: false, error: "Erro ao buscar perfil" },
+      { status: 500 }
     );
   }
 }
 
+/**
+ * Atualizar perfil
+ * PUT /api/profile/me
+ */
+export async function PUT(request: Request) {
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { ok: false, error: "Não autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json() as Record<string, unknown>;
+
+    // Construir query de update dinâmica
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    const allowedFields = [
+      'nome',
+      'email',
+      'tipo_plano',
+      'contagem_streak',
+      'foto_url',
+      'bio',
+      'peso',
+      'altura',
+      'objetivo',
+      'nome_assistente',
+    ];
+
+    for (const [key, value] of Object.entries(body)) {
+      if (allowedFields.includes(key) && value !== undefined) {
+        updates.push(`${key} = $${paramIndex}`);
+        values.push(value);
+        paramIndex++;
+      }
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "Nenhum campo para atualizar" },
+        { status: 400 }
+      );
+    }
+
+    values.push(user.id);
+
+    await query(
+      `UPDATE profiles
+       SET ${updates.join(', ')}
+       WHERE id = $${paramIndex}`,
+      values
+    );
+
+    // Buscar perfil atualizado
+    const profileResult = await query(
+      `SELECT * FROM profiles WHERE id = $1`,
+      [user.id]
+    );
+
+    return NextResponse.json({
+      ok: true,
+      profile: profileResult.rows[0],
+    });
+  } catch (error) {
+    console.error("[API /profile/me] Erro:", error);
+    return NextResponse.json(
+      { ok: false, error: "Erro ao atualizar perfil" },
+      { status: 500 }
+    );
+  }
+}

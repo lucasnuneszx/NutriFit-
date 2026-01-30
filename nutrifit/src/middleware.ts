@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { verifyTokenOnly } from "@/lib/auth-edge";
 
 function isAdminRequest(cookies: ReturnType<typeof NextRequest.prototype.cookies.getAll>) {
   const token = cookies.find((c) => c.name === "admin_token");
@@ -13,29 +13,6 @@ function isAdminRequest(cookies: ReturnType<typeof NextRequest.prototype.cookies
 }
 
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  // Se não tiver env (dev inicial), não bloqueia.
-  if (!url || !anonKey) return NextResponse.next();
-
-  const response = NextResponse.next({ request: { headers: request.headers } });
-
-  const supabase = createServerClient(url, anonKey, {
-    cookies: {
-      getAll: () => request.cookies.getAll(),
-      setAll: (cookiesToSet) => {
-        for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
-        }
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const pathname = request.nextUrl.pathname;
   const cookiesList = request.cookies.getAll();
 
@@ -50,24 +27,34 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protege /dashboard (precisa estar logado)
-  if (pathname.startsWith("/dashboard") && !user) {
-    const redirect = request.nextUrl.clone();
-    redirect.pathname = "/auth";
-    redirect.searchParams.set("next", pathname);
-    return NextResponse.redirect(redirect);
+  // Apenas valida o token JWT, sem acessar banco (Edge Runtime)
+  if (pathname.startsWith("/dashboard")) {
+    const token = request.cookies.get("auth_token")?.value || null;
+    const decoded = token ? verifyTokenOnly(token) : null;
+
+    if (!decoded) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/auth";
+      redirect.searchParams.set("next", pathname);
+      return NextResponse.redirect(redirect);
+    }
   }
 
   // Se já está logado, /auth vira /dashboard
-  if (pathname.startsWith("/auth") && user) {
-    const redirect = request.nextUrl.clone();
-    redirect.pathname = "/dashboard";
-    return NextResponse.redirect(redirect);
+  if (pathname.startsWith("/auth")) {
+    const token = request.cookies.get("auth_token")?.value || null;
+    const decoded = token ? verifyTokenOnly(token) : null;
+
+    if (decoded) {
+      const redirect = request.nextUrl.clone();
+      redirect.pathname = "/dashboard";
+      return NextResponse.redirect(redirect);
+    }
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
   matcher: ["/dashboard/:path*", "/auth/:path*", "/admin/:path*"],
 };
-

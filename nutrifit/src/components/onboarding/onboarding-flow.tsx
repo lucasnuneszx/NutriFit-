@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  MailCheck,
   Sparkles,
 } from "lucide-react";
 import { z } from "zod";
@@ -28,7 +27,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import { setPlan } from "@/components/app/local-profile";
-import { createClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/errors";
 import { OfferModal } from "./offer-modal";
 import { loadDraft, saveDraft } from "./storage";
@@ -42,7 +40,7 @@ import {
   type OnboardingDraft,
 } from "./types";
 
-type StepKey = "account" | "biometrics" | "medical" | "assistant" | "verify";
+type StepKey = "account" | "biometrics" | "medical" | "assistant";
 
 const steps: Step[] = [
   {
@@ -64,11 +62,6 @@ const steps: Step[] = [
     key: "assistant",
     title: "Sua Assistente",
     subtitle: "Defina o apelido da IA.",
-  },
-  {
-    key: "verify",
-    title: "Verificação",
-    subtitle: "Aguardando email verificado.",
   },
 ];
 
@@ -216,38 +209,7 @@ export function OnboardingFlow() {
                     <MedicalStep draft={draft} setDraft={setDraft} />
                   ) : activeKey === "assistant" ? (
                     <AssistantStep draft={draft} setDraft={setDraft} />
-                  ) : (
-                    <VerifyStep
-                      draft={draft}
-                      signupLoading={signupLoading}
-                      signupError={signupError}
-                      onCreateAccount={async () => {
-                        setSignupError(null);
-                        setSignupLoading(true);
-                        try {
-                          const supabase = createClient();
-                          const origin = window.location.origin;
-                          const { error } = await supabase.auth.signUp({
-                            email: draft.email,
-                            password: draft.senha,
-                            options: {
-                              emailRedirectTo: `${origin}/auth/callback`,
-                              data: {
-                                nome: draft.nome,
-                                nome_assistente: draft.nomeAssistente,
-                              },
-                            },
-                          });
-                          if (error) throw error;
-                          router.push("/verify");
-                        } catch (e: unknown) {
-                          setSignupError(getErrorMessage(e) || "Erro ao criar conta.");
-                        } finally {
-                          setSignupLoading(false);
-                        }
-                      }}
-                    />
-                  )}
+                  ) : null}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -270,11 +232,10 @@ export function OnboardingFlow() {
                 Voltar
               </Button>
 
-              {activeKey !== "verify" ? (
+              {canGoNext ? (
                 <Button
                   type="button"
                   onClick={next}
-                  disabled={!canGoNext}
                   className="bg-neon-cyan text-black hover:bg-neon-cyan/90"
                 >
                   Continuar
@@ -283,31 +244,63 @@ export function OnboardingFlow() {
               ) : (
                 <Button
                   type="button"
-                  onClick={() => router.push("/verify")}
-                  className="border border-cyber-glass-border bg-black/20 text-foreground hover:bg-cyber-glass/40"
+                  onClick={async () => {
+                    setError(null);
+                    setSignupLoading(true);
+                    try {
+                      // Criar conta via API
+                      const signupRes = await fetch("/api/auth/signup", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          email: draft.email,
+                          password: draft.senha,
+                          nome: draft.nome,
+                          nomeAssistente: draft.nomeAssistente,
+                        }),
+                      });
+
+                      const signupData = await signupRes.json();
+
+                      if (!signupData.ok) {
+                        throw new Error(signupData.error || "Erro ao criar conta");
+                      }
+
+                      // Bootstrap do perfil
+                      await fetch("/api/profile/bootstrap", {
+                        method: "POST",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ draft, plan: "free" }),
+                      });
+
+                      // Mostrar oferta automaticamente após criar conta
+                      setShowOffer(true);
+                    } catch (e: unknown) {
+                      setError(getErrorMessage(e) || "Erro ao criar conta.");
+                      setSignupLoading(false);
+                    }
+                  }}
+                  disabled={signupLoading}
+                  className="bg-neon-green text-black hover:bg-neon-green/90"
                 >
-                  Ir para verificação
+                  {signupLoading ? "Criando conta..." : "Finalizar Cadastro"}
+                  <Sparkles className="ml-2 h-4 w-4" />
                 </Button>
               )}
             </div>
           </div>
         </Card>
 
-        <div className="rounded-3xl border border-cyber-glass-border bg-black/20 p-4 text-xs text-muted-foreground">
-          Backend ainda não está ligado. No próximo passo, conectamos esse fluxo
-          ao Supabase Auth e salvamos no banco.
-        </div>
       </div>
 
       <OfferModal
         open={showOffer}
         userName={draft.nome}
         onAccept={() => {
-          setPlan("plus");
           setShowOffer(false);
-          router.push("/dashboard");
+          router.push("/checkout");
         }}
-        onDecline={() => {
+        onDecline={async () => {
           setPlan("free");
           setShowOffer(false);
           router.push("/dashboard");
@@ -613,58 +606,4 @@ function AssistantStep({
   );
 }
 
-function VerifyStep({
-  draft,
-  signupLoading,
-  signupError,
-  onCreateAccount,
-}: {
-  draft: OnboardingDraft;
-  signupLoading: boolean;
-  signupError: string | null;
-  onCreateAccount: () => void;
-}) {
-  return (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-cyber-glass-border bg-black/20 p-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl border border-cyber-glass-border bg-black/30">
-            <MailCheck className="h-5 w-5 text-neon-cyan" />
-          </div>
-          <div>
-            <div className="text-sm font-semibold tracking-tight">
-              Verifique seu email
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              Enviamos um link para{" "}
-              <span className="text-foreground">{draft.email || "seu email"}</span>
-              . Assim que confirmar, você continua.
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Button
-        type="button"
-        onClick={onCreateAccount}
-        className="h-12 bg-neon-green text-black hover:bg-neon-green/90"
-        disabled={signupLoading}
-      >
-        {signupLoading ? "Enviando..." : "Criar conta + Enviar verificação"}
-        <Sparkles className="ml-2 h-4 w-4" />
-      </Button>
-
-      {signupError ? (
-        <div className="rounded-2xl border border-neon-red/30 bg-black/30 px-4 py-3 text-sm text-neon-red">
-          {signupError}
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-cyber-glass-border bg-black/20 p-4 text-xs text-muted-foreground">
-          Dica: se você já tem conta, vá para <span className="text-foreground">/auth</span>{" "}
-          e faça login.
-        </div>
-      )}
-    </div>
-  );
-}
 
