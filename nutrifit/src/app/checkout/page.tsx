@@ -124,9 +124,8 @@ export default function CheckoutPage() {
                 {!paymentSuccess ? (
                   <PixPayment
                     amount={3999} // Valor em centavos (R$ 39,99)
-                    customerName={userName}
-                    customerEmail="" // O email será preenchido no componente PixPayment
-                    onPaymentSuccess={handlePaymentSuccess}
+                    plan="plus"
+                    onSuccess={handlePaymentSuccess}
                   />
                 ) : (
                   <div className="rounded-2xl border border-neon-green/30 bg-black/20 p-4 text-center">
