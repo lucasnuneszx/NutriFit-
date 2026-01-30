@@ -107,7 +107,14 @@ export async function GET(request: Request) {
       // Se encontrou ; e não está dentro de um bloco $$, é fim de comando
       if (char === ";" && !inDollarQuote) {
         const trimmed = currentCommand.trim();
-        if (trimmed.length > 0 && !trimmed.startsWith("--")) {
+        // Filtrar: não vazio, não é só comentário, não começa com --
+        if (trimmed.length > 0 && 
+            !trimmed.startsWith("--") && 
+            !trimmed.match(/^[\s-]*$/) &&
+            trimmed.split("\n").some(line => {
+              const cleanLine = line.trim();
+              return cleanLine.length > 0 && !cleanLine.startsWith("--");
+            })) {
           commands.push(trimmed);
         }
         currentCommand = "";
@@ -116,15 +123,33 @@ export async function GET(request: Request) {
 
     // Adicionar último comando se houver
     const trimmed = currentCommand.trim();
-    if (trimmed.length > 0 && !trimmed.startsWith("--")) {
+    if (trimmed.length > 0 && 
+        !trimmed.startsWith("--") && 
+        !trimmed.match(/^[\s-]*$/) &&
+        trimmed.split("\n").some(line => {
+          const cleanLine = line.trim();
+          return cleanLine.length > 0 && !cleanLine.startsWith("--");
+        })) {
       commands.push(trimmed);
     }
+
+    // Filtrar comandos que são apenas comentários ou vazios
+    const validCommands = commands.filter(cmd => {
+      const lines = cmd.split("\n");
+      const hasValidSQL = lines.some(line => {
+        const clean = line.trim();
+        return clean.length > 0 && 
+               !clean.startsWith("--") && 
+               !clean.match(/^[\s-]*$/);
+      });
+      return hasValidSQL;
+    });
 
     const results = [];
     let successCount = 0;
     let errorCount = 0;
 
-    for (const command of commands) {
+    for (const command of validCommands) {
       try {
         await query(command);
         successCount++;
