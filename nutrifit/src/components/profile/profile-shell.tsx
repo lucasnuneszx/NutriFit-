@@ -197,7 +197,6 @@ export function ProfileShell() {
           id: data.meal.id.toString(),
           url: data.meal.imagem_url,
           data: new Date(data.meal.criado_em).toLocaleDateString("pt-BR"),
-          calorias: data.meal.calorias || 0,
           descricao: data.meal.descricao || "Nova refeição",
         };
         setMeals((m) => [newMeal, ...m]);
