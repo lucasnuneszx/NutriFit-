@@ -17,8 +17,8 @@ GEMINI_API_KEY=sua-chave-gemini-aqui
 GEMINI_MODEL=gemini-3-flash-preview
 
 # Sync Pay API (Pagamentos PIX)
-SYNC_PAY_CLIENT_ID=seu-client-id-sync-pay-aqui
-SYNC_PAY_CLIENT_SECRET=seu-client-secret-sync-pay-aqui
+SYNC_PAY_CLIENT_ID=796a8a8d-3ff4-4b71-8005-46c7e39f443d
+SYNC_PAY_CLIENT_SECRET=6f7bd038-b399-4e97-8bae-a07908751c04
 SYNC_PAY_BASE_URL=https://api.syncpayments.com.br
 ```
 
@@ -43,10 +43,10 @@ SYNC_PAY_BASE_URL=https://api.syncpayments.com.br
 - Cole aqui
 
 ### 4. SYNC_PAY_CLIENT_ID e SYNC_PAY_CLIENT_SECRET
-- Acesse o painel da Sync Pay
-- Vá em: Chaves API → Criar nova chave
-- Copie o **Client ID (pública)** e o **Client Secret (privada)**
-- ⚠️ **ATENÇÃO:** O Client Secret é exibido apenas uma vez! Salve em local seguro.
+- ✅ **JÁ CONFIGURADO:**
+  - Client ID: `796a8a8d-3ff4-4b71-8005-46c7e39f443d`
+  - Client Secret: `6f7bd038-b399-4e97-8bae-a07908751c04`
+- ⚠️ **IMPORTANTE:** O Client Secret foi salvo. Não compartilhe publicamente!
 - **Documentação:** https://syncpay.apidog.io/
 
 ### 5. SYNC_PAY_BASE_URL
