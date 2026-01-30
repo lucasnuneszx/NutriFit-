@@ -16,8 +16,9 @@ JWT_SECRET=seu-secret-super-seguro-aqui-mude-em-producao-123456789
 GEMINI_API_KEY=sua-chave-gemini-aqui
 GEMINI_MODEL=gemini-3-flash-preview
 
-# Perfect Pay API (Pagamentos PIX)
-PERFECT_PAY_API_TOKEN=seu-token-jwt-perfect-pay-aqui
+# Iron Pay API (Pagamentos PIX)
+IRON_PAY_API_TOKEN=seu-token-iron-pay-aqui
+IRON_PAY_BASE_URL=https://api.ironpayapp.com.br/v1
 ```
 
 ## 📝 Como obter cada variável:
@@ -40,10 +41,16 @@ PERFECT_PAY_API_TOKEN=seu-token-jwt-perfect-pay-aqui
 - Crie uma nova API Key
 - Cole aqui
 
-### 4. PERFECT_PAY_API_TOKEN
-- Acesse o painel da Perfect Pay
-- Vá em: Ferramentas → API → Token
-- Copie o token JWT
+### 4. IRON_PAY_API_TOKEN
+- Acesse o painel da Iron Pay
+- Vá em: Configurações → API → Token
+- Copie o token
+- **Documentação:** https://docs.ironpayapp.com.br/
+
+### 5. IRON_PAY_BASE_URL
+- Verifique na documentação: https://docs.ironpayapp.com.br/
+- URL padrão: `https://api.ironpayapp.com.br/v1`
+- Se a documentação indicar outra URL, use a da documentação
 
 ## 🚀 Após configurar as variáveis:
 

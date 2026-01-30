@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-server";
 import { query } from "@/lib/db";
-import { createPerfectPayClient } from "@/lib/perfect-pay";
+import { createIronPayClient } from "@/lib/iron-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Cria um pagamento PIX via Perfect Pay
+ * Cria um pagamento PIX via Iron Pay
  * POST /api/payment/pix/create
  */
 export async function POST(request: Request) {
@@ -21,21 +21,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validar Perfect Pay
-    const perfectPay = createPerfectPayClient();
-    if (!perfectPay) {
-      console.error("[Payment API] Perfect Pay não configurado. PERFECT_PAY_API_TOKEN ausente.");
+    // Validar Iron Pay
+    const ironPay = createIronPayClient();
+    if (!ironPay) {
+      console.error("[Payment API] Iron Pay não configurado. IRON_PAY_API_TOKEN ausente.");
       return NextResponse.json(
         {
           ok: false,
-          error: "perfect_pay_not_configured",
-          message: "Perfect Pay não está configurado. Verifique as variáveis de ambiente PERFECT_PAY_API_TOKEN.",
+          error: "iron_pay_not_configured",
+          message: "Iron Pay não está configurado. Verifique as variáveis de ambiente IRON_PAY_API_TOKEN.",
         },
         { status: 500 }
       );
     }
     
-    console.log("[Payment API] Perfect Pay cliente criado com sucesso.");
+    console.log("[Payment API] Iron Pay cliente criado com sucesso.");
 
     // Ler body
     let body: { plan?: "plus"; amount?: number } = {};
@@ -70,8 +70,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Criar pagamento PIX na Perfect Pay
-    const pixResponse = await perfectPay.createPixPayment({
+    // Criar pagamento PIX na Iron Pay
+    const pixResponse = await ironPay.createPixPayment({
       amount: amount,
       description: `NutriFit+ - Assinatura ${plan === "plus" ? "NutriPlus" : "Free"}`,
       customer: {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           ok: false,
-          error: "perfect_pay_error",
+          error: "iron_pay_error",
           message: pixResponse.error?.message || "Erro ao criar pagamento PIX",
         },
         { status: 500 }
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
           amount / 100, // Converter centavos para reais
           "pendente",
           "pix",
-          pixResponse.data.id, // ID da Perfect Pay
+          pixResponse.data.id, // ID da Iron Pay
           `PIX - QR Code: ${pixResponse.data.id}`,
         ]
       );

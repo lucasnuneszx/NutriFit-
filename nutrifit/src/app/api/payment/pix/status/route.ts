@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth-server";
 import { query } from "@/lib/db";
-import { createPerfectPayClient } from "@/lib/perfect-pay";
+import { createIronPayClient } from "@/lib/iron-pay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,22 +49,22 @@ export async function GET(request: Request) {
       });
     }
 
-    // Verificar status na Perfect Pay
-    const perfectPay = createPerfectPayClient();
-    if (!perfectPay) {
+    // Verificar status na Iron Pay
+    const ironPay = createIronPayClient();
+    if (!ironPay) {
       return NextResponse.json(
-        { ok: false, error: "perfect_pay_not_configured" },
+        { ok: false, error: "iron_pay_not_configured" },
         { status: 500 },
       );
     }
 
-    const statusResponse = await perfectPay.checkPaymentStatus(paymentId);
+    const statusResponse = await ironPay.checkPaymentStatus(paymentId);
 
     if (!statusResponse.success || !statusResponse.data) {
       return NextResponse.json(
         {
           ok: false,
-          error: "perfect_pay_error",
+          error: "iron_pay_error",
           message: statusResponse.error?.message,
         },
         { status: 500 },

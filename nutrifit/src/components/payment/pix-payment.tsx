@@ -62,12 +62,12 @@ export function PixPayment({ amount, plan, onSuccess, onCancel }: PixPaymentProp
         // Mensagens de erro mais específicas
         let errorMessage = data.message || data.error || "Erro ao criar pagamento";
         
-        if (data.error === "perfect_pay_not_configured") {
-          errorMessage = "Perfect Pay não está configurado. Entre em contato com o suporte.";
+        if (data.error === "iron_pay_not_configured") {
+          errorMessage = "Iron Pay não está configurado. Entre em contato com o suporte.";
         } else if (data.error === "profile_not_found") {
           errorMessage = "Perfil não encontrado. Complete seu cadastro primeiro.";
-        } else if (data.error === "perfect_pay_error") {
-          errorMessage = `Erro na Perfect Pay: ${data.message || "Tente novamente em alguns instantes."}`;
+        } else if (data.error === "iron_pay_error") {
+          errorMessage = `Erro na Iron Pay: ${data.message || "Tente novamente em alguns instantes."}`;
         }
         
         throw new Error(errorMessage);
