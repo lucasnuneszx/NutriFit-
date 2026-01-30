@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs-20_x"]
 
 [phases.install]
-cmds = ["cd nutrifit && npm ci --legacy-peer-deps || npm ci"]
+cmds = ["cd nutrifit && npm install"]
 
 [phases.build]
 cmds = ["cd nutrifit && npm run build"]
