@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     const amount = body.amount || 3999; // R$ 39,99 em centavos (padrão)
 
     // Buscar perfil do usuário
-    const profileResult = await query(
+    const profileResult = await query<{ nome: string | null; email: string | null }>(
       `SELECT nome, email FROM profiles WHERE id = $1`,
       [user.id]
     );
