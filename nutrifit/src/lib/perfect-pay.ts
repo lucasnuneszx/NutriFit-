@@ -72,7 +72,13 @@ export class PerfectPayClient {
    */
   async createPixPayment(request: CreatePixPaymentRequest): Promise<PerfectPayPixResponse> {
     try {
-      const url = `${this.baseUrl}/payments/pix`;
+      // Endpoint para criar pagamento PIX
+      // Verificar na documentação da Perfect Pay o endpoint correto
+      // Tentando diferentes possibilidades:
+      // - /checkout (endpoint mais comum para criar pagamentos)
+      // - /payments/pix
+      // - /pix
+      const url = `${this.baseUrl}/checkout`;
       const payload = {
         amount: request.amount,
         description: request.description,
