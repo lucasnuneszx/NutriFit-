@@ -58,9 +58,9 @@ export class PerfectPayClient {
 
   constructor(config: PerfectPayConfig) {
     this.apiToken = config.apiToken;
-    // URL padrão - VERIFIQUE A DOCUMENTAÇÃO DA PERFECT PAY PARA A URL CORRETA
-    // A URL abaixo pode estar incorreta. Configure PERFECT_PAY_BASE_URL no Railway
-    this.baseUrl = config.baseUrl || 'https://api.perfectpay.com.br/v1';
+    // URL base da API Perfect Pay (conforme documentação oficial)
+    // Documentação: https://support.perfectpay.com.br/doc/perfect-pay/perfectpay-api/conhecendo-a-api
+    this.baseUrl = config.baseUrl || 'https://app.perfectpay.com.br/api';
     
     if (!this.baseUrl.startsWith('http://') && !this.baseUrl.startsWith('https://')) {
       throw new Error('PERFECT_PAY_BASE_URL deve começar com http:// ou https://');
