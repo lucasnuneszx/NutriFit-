@@ -72,19 +72,23 @@ export class PerfectPayClient {
    */
   async createPixPayment(request: CreatePixPaymentRequest): Promise<PerfectPayPixResponse> {
     try {
-      // Endpoint para criar pagamento PIX
-      // Verificar na documentação da Perfect Pay o endpoint correto
-      // Tentando diferentes possibilidades:
-      // - /checkout (endpoint mais comum para criar pagamentos)
-      // - /payments/pix
-      // - /pix
+      // Perfect Pay não tem endpoint público direto POST /pix
+      // O PIX é gerado através do checkout
+      // Tentando endpoint de checkout que gera PIX
       const url = `${this.baseUrl}/checkout`;
+      
+      // Payload conforme estrutura da Perfect Pay para checkout
+      // A Perfect Pay pode usar uma estrutura diferente - verificar documentação
       const payload = {
         amount: request.amount,
         description: request.description,
         customer: request.customer,
         metadata: request.metadata || {},
         expires_in: request.expiresIn || 30, // 30 minutos padrão
+        payment_method: 'pix', // Especificar método de pagamento como PIX
+        // Possíveis campos adicionais necessários:
+        // product_code: request.metadata?.product_code,
+        // plan_code: request.metadata?.plan_code,
       };
       
       console.log('[Perfect Pay] Criando pagamento PIX:', { 
