@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { CyberBackground } from "@/components/landing/cyber-background";
-import { createClient } from "@/lib/supabase/client";
 
 type PaymentMethod = {
   id: string;
@@ -24,7 +23,6 @@ type PaymentMethod = {
 };
 
 export function PaymentMethodsShell() {
-  const supabase = createClient();
   const [paymentMethods, setPaymentMethods] = React.useState<PaymentMethod[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showForm, setShowForm] = React.useState(false);
@@ -38,18 +36,9 @@ export function PaymentMethodsShell() {
 
   const loadPaymentMethods = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from("metodos_pagamento")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("criado_em", { ascending: false });
-
-      if (!error && data) {
-        setPaymentMethods(data);
-      }
+      // Por enquanto, métodos de pagamento não estão implementados
+      // Este componente será atualizado no futuro
+      setPaymentMethods([]);
     } catch (error) {
       console.error("Erro ao carregar métodos de pagamento:", error);
     } finally {
@@ -60,48 +49,15 @@ export function PaymentMethodsShell() {
   const handleAddPaymentMethod = async () => {
     if (!cardNumber || !cardName || !expiryDate) return;
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from("metodos_pagamento")
-        .insert([
-          {
-            user_id: user.id,
-            tipo: "credit_card",
-            ultimos_digitos: cardNumber.slice(-4),
-            bandeira: "Visa",
-            valido_ate: expiryDate,
-            ativo: true,
-          },
-        ]);
-
-      if (!error) {
-        setCardNumber("");
-        setCardName("");
-        setExpiryDate("");
-        setShowForm(false);
-        loadPaymentMethods();
-      }
-    } catch (error) {
-      console.error("Erro ao adicionar método de pagamento:", error);
-    }
+    // Por enquanto, métodos de pagamento não estão implementados
+    // Este componente será atualizado no futuro
+    alert("Funcionalidade de adicionar cartão será implementada em breve.");
   };
 
   const handleDeletePaymentMethod = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from("metodos_pagamento")
-        .delete()
-        .eq("id", id);
-
-      if (!error) {
-        loadPaymentMethods();
-      }
-    } catch (error) {
-      console.error("Erro ao deletar método de pagamento:", error);
-    }
+    // Por enquanto, métodos de pagamento não estão implementados
+    // Este componente será atualizado no futuro
+    alert("Funcionalidade de deletar cartão será implementada em breve.");
   };
 
   return (
