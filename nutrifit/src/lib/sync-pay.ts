@@ -83,7 +83,22 @@ export class SyncPayClient {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/oauth/token`, {
+      // Endpoint de autenticação da Sync Pay
+      // Verificar na documentação: https://syncpay.apidog.io/
+      // Possíveis endpoints:
+      // - /api/partner/v1/auth-token
+      // - /v1/auth/token
+      // - /auth/token
+      const authUrl = `${this.baseUrl}/api/partner/v1/auth-token`;
+      
+      console.log('[Sync Pay] Obtendo token de acesso:', { 
+        url: authUrl,
+        baseUrl: this.baseUrl,
+        hasClientId: !!this.clientId,
+        hasClientSecret: !!this.clientSecret,
+      });
+      
+      const response = await fetch(authUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -91,22 +106,44 @@ export class SyncPayClient {
         body: JSON.stringify({
           client_id: this.clientId,
           client_secret: this.clientSecret,
-          grant_type: 'client_credentials',
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`Erro ao obter token: ${errorData.error || response.statusText}`);
+        let errorData;
+        let responseText = '';
+        try {
+          responseText = await response.text();
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { 
+            message: `HTTP ${response.status}: ${response.statusText}`,
+            rawResponse: responseText.substring(0, 500)
+          };
+        }
+        
+        console.error('[Sync Pay] Erro ao obter token:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: authUrl,
+          error: errorData,
+        });
+        
+        throw new Error(`Erro ao obter token: ${errorData.error || errorData.message || response.statusText}`);
       }
 
       const data = await response.json();
       
-      if (!data.access_token || typeof data.access_token !== 'string') {
-        throw new Error('Token de acesso inválido na resposta da API');
+      // A Sync Pay pode retornar o token em diferentes campos
+      // Verificar: access_token, token, data.token, etc.
+      const token = data.access_token || data.token || data.data?.token || data.data?.access_token;
+      
+      if (!token || typeof token !== 'string') {
+        console.error('[Sync Pay] Resposta da API:', JSON.stringify(data, null, 2));
+        throw new Error('Token de acesso inválido na resposta da API. Verifique a estrutura da resposta.');
       }
       
-      this.accessToken = data.access_token;
+      this.accessToken = token;
       // Token geralmente expira em 3600 segundos (1 hora)
       this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
 
