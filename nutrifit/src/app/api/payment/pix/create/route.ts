@@ -97,7 +97,7 @@ export async function POST(request: Request) {
     // Salvar transação no banco
     let transactionId: string | null = null;
     try {
-      const transactionResult = await query(
+      const transactionResult = await query<{ id: number; criado_em: string }>(
         `INSERT INTO transactions (user_id, tipo, plano, valor, status, metodo_pagamento, referencia_externa, notas)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id, criado_em`,
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
         ]
       );
 
-      transactionId = transactionResult.rows[0]?.id || null;
+      transactionId = transactionResult.rows[0]?.id?.toString() || null;
     } catch (error) {
       console.error("[Payment API] Erro ao salvar transação:", error);
       // Continuar mesmo assim, o pagamento foi criado na Perfect Pay
