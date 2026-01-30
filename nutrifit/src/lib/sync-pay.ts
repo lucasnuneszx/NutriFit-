@@ -101,10 +101,20 @@ export class SyncPayClient {
       }
 
       const data = await response.json();
+      
+      if (!data.access_token || typeof data.access_token !== 'string') {
+        throw new Error('Token de acesso inválido na resposta da API');
+      }
+      
       this.accessToken = data.access_token;
       // Token geralmente expira em 3600 segundos (1 hora)
       this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
 
+      // Garantir que sempre retornamos uma string válida
+      if (!this.accessToken) {
+        throw new Error('Token de acesso não foi definido');
+      }
+      
       return this.accessToken;
     } catch (error) {
       console.error('[Sync Pay] Erro ao obter token:', error);
