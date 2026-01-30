@@ -49,11 +49,76 @@ export async function GET(request: Request) {
     const sql = fs.readFileSync(sqlFilePath, "utf8");
 
     // Executar o SQL
-    // Dividir em comandos individuais (separados por ;)
-    const commands = sql
-      .split(";")
-      .map((cmd) => cmd.trim())
-      .filter((cmd) => cmd.length > 0 && !cmd.startsWith("--"));
+    // Dividir em comandos individuais de forma inteligente
+    // Respeitando blocos $$ ... $$ e funções PL/pgSQL
+    const commands: string[] = [];
+    let currentCommand = "";
+    let inDollarQuote = false;
+    let dollarTag = "";
+    let inComment = false;
+
+    for (let i = 0; i < sql.length; i++) {
+      const char = sql[i];
+      const nextChar = sql[i + 1];
+
+      // Detectar comentários de linha (--)
+      if (char === "-" && nextChar === "-" && !inDollarQuote) {
+        inComment = true;
+        currentCommand += char;
+        i++; // Pular o próximo -
+        continue;
+      }
+
+      // Detectar fim de comentário de linha
+      if (inComment && char === "\n") {
+        inComment = false;
+        currentCommand += char;
+        continue;
+      }
+
+      if (inComment) {
+        currentCommand += char;
+        continue;
+      }
+
+      // Detectar início de bloco $$ ... $$
+      if (char === "$" && !inDollarQuote) {
+        const match = sql.substring(i).match(/^\$([^$]*)\$/);
+        if (match) {
+          dollarTag = match[0];
+          inDollarQuote = true;
+          currentCommand += dollarTag;
+          i += dollarTag.length - 1; // Pular o resto do tag
+          continue;
+        }
+      }
+
+      // Detectar fim de bloco $$ ... $$
+      if (inDollarQuote && sql.substring(i).startsWith(dollarTag)) {
+        currentCommand += dollarTag;
+        i += dollarTag.length - 1;
+        inDollarQuote = false;
+        dollarTag = "";
+        continue;
+      }
+
+      currentCommand += char;
+
+      // Se encontrou ; e não está dentro de um bloco $$, é fim de comando
+      if (char === ";" && !inDollarQuote) {
+        const trimmed = currentCommand.trim();
+        if (trimmed.length > 0 && !trimmed.startsWith("--")) {
+          commands.push(trimmed);
+        }
+        currentCommand = "";
+      }
+    }
+
+    // Adicionar último comando se houver
+    const trimmed = currentCommand.trim();
+    if (trimmed.length > 0 && !trimmed.startsWith("--")) {
+      commands.push(trimmed);
+    }
 
     const results = [];
     let successCount = 0;
