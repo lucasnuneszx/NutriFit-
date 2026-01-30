@@ -1,11 +1,13 @@
 [phases.setup]
 nixPkgs = ["nodejs-20_x"]
+nixLibs = []
 
 [phases.install]
-cmds = ["cd nutrifit && npm ci --legacy-peer-deps || npm ci"]
+cmds = ["cd nutrifit && npm ci"]
 
 [phases.build]
 cmds = ["cd nutrifit && npm run build"]
 
 [start]
 cmd = "cd nutrifit && npm start"
+
