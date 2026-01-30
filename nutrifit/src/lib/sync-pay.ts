@@ -134,18 +134,22 @@ export class SyncPayClient {
 
       const data = await response.json();
       
-      // A Sync Pay pode retornar o token em diferentes campos
-      // Verificar: access_token, token, data.token, etc.
-      const token = data.access_token || data.token || data.data?.token || data.data?.access_token;
-      
-      if (!token || typeof token !== 'string') {
+      // Conforme documentação: https://syncpay.apidog.io/
+      // Resposta: { "access_token": "...", "token_type": "Bearer", "expires_in": 3600, "expires_at": "..." }
+      if (!data.access_token || typeof data.access_token !== 'string') {
         console.error('[Sync Pay] Resposta da API:', JSON.stringify(data, null, 2));
         throw new Error('Token de acesso inválido na resposta da API. Verifique a estrutura da resposta.');
       }
       
-      this.accessToken = token;
-      // Token geralmente expira em 3600 segundos (1 hora)
+      this.accessToken = data.access_token;
+      // Token expira em 3600 segundos (1 hora) conforme documentação
       this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+      
+      console.log('[Sync Pay] Token obtido com sucesso:', {
+        tokenType: data.token_type,
+        expiresIn: data.expires_in,
+        expiresAt: data.expires_at,
+      });
 
       // Garantir que sempre retornamos uma string válida
       if (!this.accessToken) {
