@@ -19,8 +19,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Output standalone para melhor compatibilidade com Railway
-  output: "standalone",
 };
 
 export default nextConfig;
