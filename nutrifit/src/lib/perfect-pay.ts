@@ -89,10 +89,12 @@ export class PerfectPayClient {
       
       console.log('[Perfect Pay] Criando pagamento PIX:', { 
         url, 
+        fullUrl: url,
         amount: request.amount,
         baseUrl: this.baseUrl,
         hasToken: !!this.apiToken,
         tokenLength: this.apiToken?.length || 0,
+        payload: payload,
       });
       
       // Adicionar timeout de 30 segundos
