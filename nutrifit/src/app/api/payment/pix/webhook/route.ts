@@ -23,11 +23,19 @@ export async function POST(request: Request) {
 
     const webhookData = body as {
       event?: string;
+      identifier?: string;
+      reference_id?: string;
+      id?: string;
+      status?: string;
+      paid_at?: string;
+      amount?: number;
       data?: {
-        id: string;
-        status: string;
+        id?: string;
+        identifier?: string;
+        reference_id?: string;
+        status?: string;
         paid_at?: string;
-        amount: number;
+        amount?: number;
         metadata?: {
           user_id?: string;
           plan?: string;
@@ -37,17 +45,40 @@ export async function POST(request: Request) {
 
     console.log("[Webhook] Recebido:", JSON.stringify(webhookData, null, 2));
 
-    // Validar evento
-    if (webhookData.event !== "payment.paid" && webhookData.data?.status !== "paid") {
-      return NextResponse.json({ ok: true, message: "Evento ignorado" });
-    }
+    // Extrair ID da transação de diferentes formatos possíveis
+    // SyncPay pode enviar identifier, reference_id, id, ou data.identifier, etc.
+    const paymentId = 
+      webhookData.identifier || 
+      webhookData.reference_id || 
+      webhookData.id || 
+      webhookData.data?.identifier || 
+      webhookData.data?.reference_id || 
+      webhookData.data?.id || 
+      null;
 
-    const paymentId = webhookData.data?.id;
     if (!paymentId) {
+      console.error("[Webhook] ID de transação não encontrado no payload:", JSON.stringify(webhookData, null, 2));
       return NextResponse.json(
         { ok: false, error: "missing_payment_id" },
         { status: 400 }
       );
+    }
+
+    // Extrair status
+    const status = webhookData.status || webhookData.data?.status || '';
+    const statusLower = status.toLowerCase();
+
+    // Validar se o pagamento foi confirmado
+    // SyncPay usa 'completed' como status de pagamento confirmado
+    const isPagamentoConfirmado = 
+      statusLower === 'completed' || 
+      statusLower === 'paid' || 
+      statusLower === 'approved' || 
+      statusLower === 'confirmed';
+
+    if (!isPagamentoConfirmado) {
+      console.log("[Webhook] Status não é pago, ignorando:", statusLower);
+      return NextResponse.json({ ok: true, message: "Evento ignorado - status não é pago" });
     }
 
     // Buscar transação pelo ID externo (Sync Pay)
