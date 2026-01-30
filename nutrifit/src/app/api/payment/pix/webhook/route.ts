@@ -51,11 +51,16 @@ export async function POST(request: Request) {
     }
 
     // Buscar transação pelo ID externo (Sync Pay)
+    // SyncPay pode enviar identifier, reference_id, ou id
     const transactionResult = await query<{ id: number; user_id: string; plano: string; status: string }>(
       `SELECT id, user_id, plano, status
        FROM transactions
-       WHERE referencia_externa = $1`,
-      [paymentId]
+       WHERE referencia_externa = $1 OR referencia_externa = $2 OR referencia_externa = $3`,
+      [
+        paymentId,
+        webhookData.data?.identifier || '',
+        webhookData.data?.reference_id || '',
+      ]
     );
 
     const transaction = transactionResult.rows[0];

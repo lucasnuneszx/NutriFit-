@@ -75,6 +75,7 @@ export class SyncPayClient {
 
   /**
    * Obtém token de acesso OAuth2
+   * Endpoint: /api/partner/v1/auth-token
    */
   private async getAccessToken(): Promise<string> {
     // Verificar se o token ainda é válido (com margem de 5 minutos)
@@ -84,12 +85,10 @@ export class SyncPayClient {
 
     try {
       // Endpoint de autenticação da Sync Pay
-      // Verificar na documentação: https://syncpay.apidog.io/
-      // Possíveis endpoints:
-      // - /api/partner/v1/auth-token
-      // - /v1/auth/token
-      // - /auth/token
-      const authUrl = `${this.baseUrl}/api/partner/v1/auth-token`;
+      // Documentação: https://syncpay.apidog.io/
+      const authUrl = this.baseUrl.endsWith('/')
+        ? `${this.baseUrl}api/partner/v1/auth-token`
+        : `${this.baseUrl}/api/partner/v1/auth-token`;
       
       console.log('[Sync Pay] Obtendo token de acesso:', { 
         url: authUrl,
@@ -143,14 +142,16 @@ export class SyncPayClient {
       
       this.accessToken = data.access_token;
       // Token expira em 3600 segundos (1 hora) conforme documentação
-      this.tokenExpiresAt = Date.now() + (data.expires_in || 3600) * 1000;
+      // Expirar 5 minutos antes do tempo real para garantir validade
+      const expiresIn = (data.expires_in || 3600) - 300; // 300 segundos = 5 minutos
+      this.tokenExpiresAt = Date.now() + expiresIn * 1000;
       
       console.log('[Sync Pay] Token obtido com sucesso:', {
         tokenType: data.token_type,
         expiresIn: data.expires_in,
         expiresAt: data.expires_at,
       });
-
+      
       // Garantir que sempre retornamos uma string válida
       if (!this.accessToken) {
         throw new Error('Token de acesso não foi definido');
@@ -165,35 +166,39 @@ export class SyncPayClient {
 
   /**
    * Cria um pagamento PIX
+   * Endpoint: /api/partner/v1/cash-in
    */
   async createPixPayment(request: CreatePixPaymentRequest): Promise<SyncPayPixResponse> {
     try {
       // Obter token de acesso
       const token = await this.getAccessToken();
 
-      // Endpoint para criar pagamento PIX
-      // Verificar na documentação da Sync Pay o endpoint correto
-      // Possíveis endpoints:
-      // - /v1/pix
-      // - /v1/payments/pix
-      // - /v1/transactions/pix
-      const url = `${this.baseUrl}/v1/pix`;
+      // Endpoint para criar pagamento PIX (CashIn)
+      // Documentação: https://syncpay.apidog.io/
+      const cashInUrl = this.baseUrl.endsWith('/')
+        ? `${this.baseUrl}api/partner/v1/cash-in`
+        : `${this.baseUrl}/api/partner/v1/cash-in`;
+      
+      // Converter valor de centavos para reais (SyncPay espera valor em reais)
+      const valorEmReais = request.amount / 100;
+      
+      // Configurar URL do webhook se disponível
+      const webhookUrl = process.env.NEXT_PUBLIC_SITE_URL
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/payment/pix/webhook`
+        : undefined;
       
       const payload = {
-        amount: request.amount,
+        amount: valorEmReais, // Valor em reais (double)
         description: request.description,
-        customer: request.customer,
-        metadata: request.metadata || {},
-        expires_in: request.expiresIn || 30, // 30 minutos padrão
+        ...(webhookUrl && { webhook_url: webhookUrl }),
       };
       
       console.log('[Sync Pay] Criando pagamento PIX:', { 
-        url, 
-        fullUrl: url,
-        amount: request.amount,
+        url: cashInUrl,
+        amount: valorEmReais,
+        amountCents: request.amount,
         baseUrl: this.baseUrl,
-        hasClientId: !!this.clientId,
-        hasClientSecret: !!this.clientSecret,
+        hasToken: !!token,
         payload: payload,
       });
       
@@ -201,11 +206,12 @@ export class SyncPayClient {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
-      const response = await fetch(url, {
+      const response = await fetch(cashInUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
         },
         body: JSON.stringify(payload),
         signal: controller.signal,
@@ -223,16 +229,15 @@ export class SyncPayClient {
         } catch {
           errorData = { 
             message: `HTTP ${response.status}: ${response.statusText}`,
-            rawResponse: responseText.substring(0, 500) // Limitar tamanho
+            rawResponse: responseText.substring(0, 500)
           };
         }
         
         console.error('[Sync Pay] Erro na resposta:', {
           status: response.status,
           statusText: response.statusText,
-          url: url,
+          url: cashInUrl,
           error: errorData,
-          responseHeaders: Object.fromEntries(response.headers.entries()),
         });
         
         return {
@@ -245,18 +250,20 @@ export class SyncPayClient {
       }
 
       const data = await response.json();
-      console.log('[Sync Pay] Pagamento criado com sucesso:', { id: data.id });
+      console.log('[Sync Pay] Pagamento criado com sucesso:', { identifier: data.identifier });
 
+      // Adaptar resposta da SyncPay para formato esperado
+      // SyncPay retorna: { identifier, pix_code, status, amount, ... }
       return {
         success: true,
         data: {
-          id: data.id,
-          qr_code: data.qr_code,
-          qr_code_url: data.qr_code_url || data.qr_code,
-          copy_paste: data.copy_paste || data.pix_code,
-          expires_at: data.expires_at,
-          status: data.status || 'pending',
-          amount: data.amount,
+          id: data.identifier || data.id,
+          qr_code: data.qr_code || null, // SyncPay pode não retornar QR code base64
+          qr_code_url: data.qr_code_url || null,
+          copy_paste: data.pix_code || data.pixCode || '', // Código PIX EMV completo
+          expires_at: data.expires_at || new Date(Date.now() + (request.expiresIn || 30) * 60 * 1000).toISOString(),
+          status: (data.status?.toLowerCase() || 'pending') as 'pending' | 'paid' | 'expired' | 'cancelled',
+          amount: request.amount, // Manter em centavos para compatibilidade
         },
       };
     } catch (error) {
@@ -265,7 +272,6 @@ export class SyncPayClient {
         errorType: error?.constructor?.name,
         errorMessage: error instanceof Error ? error.message : String(error),
         baseUrl: this.baseUrl,
-        url: `${this.baseUrl}/v1/pix`,
       });
       
       // Mensagens de erro mais específicas
@@ -296,36 +302,71 @@ export class SyncPayClient {
 
   /**
    * Verifica status de um pagamento
+   * Endpoint: /api/partner/v1/transaction/{transactionId}
    */
   async checkPaymentStatus(paymentId: string): Promise<CheckPaymentStatusResponse> {
     try {
       const token = await this.getAccessToken();
-      const response = await fetch(`${this.baseUrl}/v1/payments/${paymentId}`, {
+      
+      const statusUrl = this.baseUrl.endsWith('/')
+        ? `${this.baseUrl}api/partner/v1/transaction/${paymentId}`
+        : `${this.baseUrl}/api/partner/v1/transaction/${paymentId}`;
+      
+      console.log('[Sync Pay] Verificando status de pagamento:', { url: statusUrl, paymentId });
+
+      const response = await fetch(statusUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
         },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (response.status === 404) {
         return {
           success: false,
           error: {
-            code: data.error?.code || 'UNKNOWN_ERROR',
-            message: data.error?.message || 'Erro ao verificar pagamento',
+            code: 'NOT_FOUND',
+            message: 'Transação não encontrada',
           },
         };
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          error: {
+            code: errorData.error?.code || 'UNKNOWN_ERROR',
+            message: errorData.error?.message || errorData.message || 'Erro ao verificar pagamento',
+          },
+        };
+      }
+
+      const data = await response.json();
+      console.log('[Sync Pay] Status de pagamento:', { identifier: data.identifier, status: data.status });
+
+      // Adaptar resposta da SyncPay
+      const transactionData = data.data || data;
+      const status = transactionData.status?.toLowerCase() || 'pending';
+      
+      // Mapear status do SyncPay
+      let mappedStatus: 'pending' | 'paid' | 'expired' | 'cancelled' = 'pending';
+      if (status === 'completed') {
+        mappedStatus = 'paid';
+      } else if (status === 'pending' || status === 'processing') {
+        mappedStatus = 'pending';
+      } else if (status === 'cancelled' || status === 'canceled') {
+        mappedStatus = 'cancelled';
       }
 
       return {
         success: true,
         data: {
-          id: data.id,
-          status: data.status,
-          paid_at: data.paid_at,
-          amount: data.amount,
+          id: transactionData.identifier || transactionData.reference_id || paymentId,
+          status: mappedStatus,
+          paid_at: transactionData.transaction_date || transactionData.paid_at,
+          amount: transactionData.amount ? Math.round(transactionData.amount * 100) : 0, // Converter para centavos
         },
       };
     } catch (error) {
@@ -384,4 +425,3 @@ export function createSyncPayClient(): SyncPayClient | null {
     return null;
   }
 }
-
