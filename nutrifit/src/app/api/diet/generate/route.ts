@@ -154,9 +154,7 @@ Retorne APENAS um JSON válido (sem markdown, sem código, apenas o JSON) com es
       maxOutputTokens: 2000,
       responseMimeType: "application/json",
     },
-    systemInstruction: {
-      parts: [{ text: "Você é uma nutricionista esportiva especializada em dietas de alta performance. Sempre retorne JSON válido e estruturado." }],
-    },
+    systemInstruction: "Você é uma nutricionista esportiva especializada em dietas de alta performance. Sempre retorne JSON válido e estruturado.",
   });
 
   try {
