@@ -58,7 +58,13 @@ export class PerfectPayClient {
 
   constructor(config: PerfectPayConfig) {
     this.apiToken = config.apiToken;
+    // URL padrão - VERIFIQUE A DOCUMENTAÇÃO DA PERFECT PAY PARA A URL CORRETA
+    // A URL abaixo pode estar incorreta. Configure PERFECT_PAY_BASE_URL no Railway
     this.baseUrl = config.baseUrl || 'https://api.perfectpay.com.br/v1';
+    
+    if (!this.baseUrl.startsWith('http://') && !this.baseUrl.startsWith('https://')) {
+      throw new Error('PERFECT_PAY_BASE_URL deve começar com http:// ou https://');
+    }
   }
 
   /**
@@ -240,9 +246,20 @@ export function createPerfectPayClient(): PerfectPayClient | null {
     return null;
   }
 
-  return new PerfectPayClient({
-    apiToken,
-    baseUrl,
-  });
+  // Avisar se a URL padrão está sendo usada (pode estar incorreta)
+  if (!baseUrl) {
+    console.warn('[Perfect Pay] PERFECT_PAY_BASE_URL não configurada. Usando URL padrão que pode estar incorreta.');
+    console.warn('[Perfect Pay] Verifique a documentação da Perfect Pay e configure PERFECT_PAY_BASE_URL no Railway.');
+  }
+
+  try {
+    return new PerfectPayClient({
+      apiToken,
+      baseUrl,
+    });
+  } catch (error) {
+    console.error('[Perfect Pay] Erro ao criar cliente:', error);
+    return null;
+  }
 }
 
