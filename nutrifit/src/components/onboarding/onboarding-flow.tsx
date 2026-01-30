@@ -273,10 +273,14 @@ export function OnboardingFlow() {
                       });
 
                       // Aguardar um pouco para garantir que tudo foi processado
-                      await new Promise(resolve => setTimeout(resolve, 500));
+                      await new Promise(resolve => setTimeout(resolve, 300));
 
                       // Mostrar oferta automaticamente após criar conta
-                      setShowOffer(true);
+                      // Usar setTimeout para garantir que o estado seja atualizado após o render
+                      setTimeout(() => {
+                        setShowOffer(true);
+                      }, 100);
+                      
                       setSignupLoading(false);
                     } catch (e: unknown) {
                       setError(getErrorMessage(e) || "Erro ao criar conta.");
