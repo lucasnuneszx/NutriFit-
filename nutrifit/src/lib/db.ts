@@ -41,7 +41,7 @@ function getPool(): Pool {
 /**
  * Executa uma query SQL
  */
-export async function query<T = unknown>(
+export async function query<T extends Record<string, unknown> = Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> {
