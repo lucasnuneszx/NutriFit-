@@ -51,7 +51,7 @@ export async function POST(request: Request) {
     }
 
     // Buscar transação pelo ID externo (Perfect Pay)
-    const transactionResult = await query(
+    const transactionResult = await query<{ id: number; user_id: string; plano: string; status: string }>(
       `SELECT id, user_id, plano, status
        FROM transactions
        WHERE referencia_externa = $1`,
